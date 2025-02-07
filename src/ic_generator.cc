@@ -954,7 +954,7 @@ int run( config_file& the_config )
                     phi.FourierTransformForward();
                     tmp.FourierTransformForward(false);
                     tmp.assign_function_of_grids_kdep( []( auto kvec, auto pphi ){
-                        return - kvec.norm_squared() *  pphi;
+                        return kvec.norm_squared() *  pphi;
                     }, phi);
                     tmp.Write_PowerSpectrum("input_powerspec_sampled_SPT.txt");
                     tmp.FourierTransformBackward();
