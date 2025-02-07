@@ -22,6 +22,21 @@
 #include <random_plugin.hh>
 #include "random_music_wnoise_generator.hh"
 
+inline double Meyer_scaling_function( double k, double kmax )
+{
+  constexpr double twopithirds{2.0*M_PI/3.0};
+  constexpr double fourpithirds{4.0*M_PI/3.0};
+  auto nu = []( double x ){ return x<0.0?0.0:(x<1.0?x:1.0); };
+
+  k = std::abs(k)/kmax * 2 * M_PI;
+
+  if( k < twopithirds ) return 1.0;
+  else if( k< fourpithirds ){
+    return std::cos( 0.5*M_PI * nu(3*k/(2*M_PI)-1.0) );
+  }
+  return 0.0;
+}
+
 template <typename T>
 music_wnoise_generator<T>::music_wnoise_generator(unsigned res, unsigned cubesize, long baseseed, int *x0, int *lx)
     : res_(res), cubesize_(cubesize), ncubes_(1), baseseed_(baseseed)
@@ -43,7 +58,7 @@ music_wnoise_generator<T>::music_wnoise_generator(unsigned res, unsigned cubesiz
 
   initialize();
   mean = fill_all();
-  
+
   if (zeromean)
   {
     mean = 0.0;
@@ -389,7 +404,7 @@ music_wnoise_generator<T>::music_wnoise_generator(/*const*/ music_wnoise_generat
 
 template <typename T>
 music_wnoise_generator<T>::music_wnoise_generator(music_wnoise_generator<T> &rc, unsigned cubesize, long baseseed,
-                                                  bool kspace, bool isolated, int *x0_, int *lx_, bool zeromean)
+                                                  bool music2_rng, bool kspace, bool isolated, int *x0_, int *lx_, bool zeromean)
     : res_(2 * rc.res_), cubesize_(cubesize), ncubes_(1), baseseed_(baseseed)
 {
   initialize();
@@ -496,15 +511,16 @@ music_wnoise_generator<T>::music_wnoise_generator(music_wnoise_generator<T> &rc,
 
           val *= val_phas * sqrt8;
 
-          if (i != (int)nxc / 2 && j != (int)nyc / 2 && k != (int)nzc / 2)
-          {
-            cfine[qf][0] = val.real();
-            cfine[qf][1] = val.imag();
-          }
-          else
-          {
-            //RE(cfine[qf]) = val.real();
-            //IM(cfine[qf]) = 0.0;
+          if(i != (int)nxc / 2 && j != (int)nyc / 2 && k != (int)nzc / 2){
+            double blend_coarse_x = Meyer_scaling_function(kx, nxc / 2);
+            double blend_coarse_y = Meyer_scaling_function(ky, nyc / 2);
+            double blend_coarse_z = Meyer_scaling_function(kz, nzc / 2);
+
+            double blend_coarse = blend_coarse_x*blend_coarse_y*blend_coarse_z;
+            double blend_fine = std::sqrt(1.0-blend_coarse*blend_coarse);
+
+            cfine[qf][0] = blend_fine * cfine[qf][0] + blend_coarse * val.real();
+            cfine[qf][1] = blend_fine * cfine[qf][1] + blend_coarse * val.imag();
           }
         }
 

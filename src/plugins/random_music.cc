@@ -216,6 +216,11 @@ void RNG_music::parse_random_parameters(void)
 void RNG_music::compute_random_numbers(void)
 {
   bool rndsign = pcf_->get_value_safe<bool>("random", "grafic_sign", false);
+  bool music2_rng = pcf_->get_value_safe<bool>("random", "music2_rng", false);
+  if (music2_rng)
+  {
+    music::ilog.Print("MUSIC1 RNG plugin: using MUSIC2 compatible seeds");
+  }
 
   //--- FILL ALL WHITE NOISE ARRAYS FOR WHICH WE NEED THE FULL FIELD ---//
 
@@ -235,9 +240,9 @@ void RNG_music::compute_random_numbers(void)
       //#warning add possibility to read noise from file also here!
 
       if (rngfnames_[i].size() > 0)
-        music::ilog.Print("Warning: Cannot use filenames for higher levels currently! Ignoring!");
+        music::wlog.Print("Warning: Cannot use filenames for higher levels currently! Ignoring!");
 
-      randc_[i] = new rng(*randc_[i - 1], ran_cube_size_, rngseeds_[i], true);
+      randc_[i] = new rng(*randc_[i - 1], ran_cube_size_, rngseeds_[i], music2_rng, true);
       delete randc_[i - 1];
       randc_[i - 1] = NULL;
     }

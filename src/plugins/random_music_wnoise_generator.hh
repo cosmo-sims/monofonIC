@@ -162,7 +162,7 @@ public:
   music_wnoise_generator(unsigned res, unsigned cubesize, long baseseed, int *x0, int *lx);
 
   //! constructor for constrained fine field
-  music_wnoise_generator(music_wnoise_generator<T> &rc, unsigned cubesize, long baseseed,
+  music_wnoise_generator(music_wnoise_generator<T> &rc, unsigned cubesize, long baseseed, bool music2_rng,
                          bool kspace = false, bool isolated = false, int *x0_ = NULL, int *lx_ = NULL, bool zeromean = true);
 
   //! constructor
