@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
+#include <array>
 #include <map>
 #include <string>
 
@@ -35,7 +36,7 @@ namespace cosmology
     private:
         std::map<std::string, double> pmap_;  //!< All parameters are stored here as key-value pairs
 
-        static defaultmmap_t default_pmaps_;  //!< Holds pre-defined parameter sets, see src/cosmology_parameters.cc 
+        static defaultmmap_t default_pmaps_;  //!< Holds pre-defined parameter sets, see src/cosmology_parameters.cc
 
     public:
         //! get routine for cosmological parameter key-value pairs
@@ -80,7 +81,7 @@ namespace cosmology
         explicit parameters( config_file &cf )
         {
             music::ilog << "-------------------------------------------------------------------------------" << std::endl;
-            
+
             if( cf.get_value_safe<std::string>("cosmology","ParameterSet","none") == std::string("none"))
             {
                 //-------------------------------------------------------------------------------
@@ -88,7 +89,7 @@ namespace cosmology
                 //-------------------------------------------------------------------------------
 
                 auto defaultp = default_pmaps_.find("Planck2018EE+BAO+SN")->second;
-            
+
                 // CMB
                 pmap_["Tcmb"] = cf.get_value_safe<double>("cosmology", "Tcmb", defaultp["Tcmb"]);
                 pmap_["YHe"] = cf.get_value_safe<double>("cosmology", "YHe", defaultp["YHe"]);
@@ -106,7 +107,7 @@ namespace cosmology
                 pmap_["k_p"] = cf.get_value_safe<double>("cosmology", "k_p", defaultp["k_p"]);
 
                 pmap_["sigma_8"] = cf.get_value_safe<double>("cosmology", "sigma_8", -1.0);
-                
+
                 // baryon and non-relativistic matter content
                 pmap_["Omega_b"] = cf.get_value_safe<double>("cosmology", "Omega_b", defaultp["Omega_b"]);
                 pmap_["Omega_m"] = cf.get_value_safe<double>("cosmology", "Omega_m", defaultp["Omega_m"]);
@@ -116,10 +117,10 @@ namespace cosmology
                 pmap_["m_nu2"] = cf.get_value_safe<double>("cosmology", "m_nu2", defaultp["m_nu2"]);
                 pmap_["m_nu3"] = cf.get_value_safe<double>("cosmology", "m_nu3", defaultp["m_nu3"]);
                 int N_nu_massive = int(this->get("m_nu1") > 1e-9) + int(this->get("m_nu2") > 1e-9) + int(this->get("m_nu3") > 1e-9);;
-                
+
                 // number ultrarelativistic neutrinos
                 pmap_["N_ur"] = cf.get_value_safe<double>("cosmology", "N_ur", 3.046 - N_nu_massive);
-            
+
                 // dark energy
                 pmap_["Omega_DE"] = cf.get_value_safe<double>("cosmology", "Omega_L", defaultp["Omega_DE"]);
                 pmap_["w_0"] = cf.get_value_safe<double>("cosmology", "w_0", defaultp["w_0"]);
@@ -142,6 +143,52 @@ namespace cosmology
                 }else{
                     music::ilog << "Loading cosmological parameter set \'" << it->first << "\'..." << std::endl;
                 }
+                // The order doesn't matter, so keep it in the order of the example.conf
+                std::array<std::string, 18> config_keys = {
+                    "Omega_m", "Omega_b", "Omega_L", "H0", "nspec", "n_s", "sigma_8", "A_s", "A_s", "Tcmb", "YHe",
+                    "k_p", "m_nu1", "m_nu2", "m_nu3", "N_ur", "w_0", "w_a"
+                };
+
+                for (const std::string &config_key: config_keys) {
+                    auto parameter_key = config_key;
+                    if (config_key == "H0") {
+                        parameter_key = "h";
+                    } else if (config_key == "nspec") {
+                        parameter_key = "n_s";
+                    } else if (config_key == "Omega_L") {
+                        parameter_key = "Omega_DE";
+                    }
+                    if (config_key == "N_ur") {
+                        if (
+                            cf.contains_key("cosmology/m_nu1") ||
+                            cf.contains_key("cosmology/m_nu2") ||
+                            cf.contains_key("cosmology/m_nu3")) {
+                            int N_nu_massive = int(it->second["m_nu1"] > 1e-9) + int(it->second["m_nu2"] > 1e-9) + int(
+                                                   it->second["m_nu3"] > 1e-9);
+
+                            const double N_ur = 3.046 - N_nu_massive;
+                            music::ilog << "Setting N_ur=" << N_ur << std::endl;
+                            it->second["N_ur"] = N_ur;
+                        }
+                    }
+                    if (cf.contains_key("cosmology/" + config_key)) {
+                        const auto original_parameter = it->second[parameter_key];
+                        auto replaced_parameter = cf.get_value_basic<double>("cosmology", config_key);
+                        if (parameter_key == "h") {
+                            replaced_parameter /= 100.0;
+                        }
+                        music::ilog << "Overriding parameter "<< std::setw(9) << std::left << parameter_key
+                                << ": " << original_parameter
+                                << " -> " << replaced_parameter << std::endl;
+                        it->second[parameter_key] = replaced_parameter;
+                        if (config_key == "sigma_8") {
+                            it->second["A_s"] = -1.0;
+                            music::ilog << "setting A_s=-1.0 as sigma_8 is set" << parameter_key << std::endl;
+                            // If sigma_8 and A_s is set, A_s wins
+                        }
+                    }
+                }
+
 
                 // copy pre-defined set in
                 for( auto entry : it->second ){
@@ -162,7 +209,7 @@ namespace cosmology
 
             // calculate energy density in ultrarelativistic species from Tcmb and Neff
             // photons
-            pmap_["Omega_gamma"] = 4 * phys_const::sigma_SI / std::pow(phys_const::c_SI, 3) * std::pow(this->get("Tcmb"), 4.0) 
+            pmap_["Omega_gamma"] = 4 * phys_const::sigma_SI / std::pow(phys_const::c_SI, 3) * std::pow(this->get("Tcmb"), 4.0)
                     / phys_const::rhocrit_h2_SI / (this->get("h") * this->get("h"));
             // massless neutrinos
             pmap_["Omega_nu_massless"] = this->get("N_ur") * this->get("Omega_gamma") * 7. / 8. * std::pow(4. / 11., 4. / 3.);
