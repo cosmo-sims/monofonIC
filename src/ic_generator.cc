@@ -345,6 +345,17 @@ int run( config_file& the_config )
         return ((bDoInversion)? real_t{-1.0} : real_t{1.0}) * wn / volfac;
     });
 
+    //--------------------------------------------------------------------
+    // Remove Corner modes or not by zeroing them
+    //--------------------------------------------------------------------
+
+    if( the_config.get_value_safe<bool>("setup", "DoRemoveCornerModes", false) ){
+        // remove corner modes
+        wnoise.apply_function_k_dep( [&](auto wn, auto k){
+            if( k.norm() > wnoise.kny_[0] ) return ccomplex_t(0.0,0.0);
+            return wn;
+        });
+    }
 
     //--------------------------------------------------------------------
     // Compute the LPT terms....
