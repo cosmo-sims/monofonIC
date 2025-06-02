@@ -1,3 +1,5 @@
+[![CMake on multiple platforms](https://github.com/cosmo-sims/monofonIC/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/cosmo-sims/monofonIC/actions/workflows/cmake-multi-platform.yml)
+
 # MUSIC2 - monofonIC
 Modular high-precision IC generator for cosmological simulations. MUSIC2-monofonIC is for non-zoom full box ICs (use [MUSIC](https://bitbucket.org/ohahn/music) for zooms, MUSIC2 for zooms is in the works).
 
@@ -51,6 +53,7 @@ If you use MUSIC2-monofonIC in your scientific work, you are required to acknowl
 
 - For baryon+CDM sims, or PPT numerics related aspects: Hahn et al. 2020 [arXiv:2008.09124](https://arxiv.org/abs/2008.09124)
 
+You can find the respective BibTeX entries in the enclosed CITATION.bib file.
 
 ## Acknowledgments
 

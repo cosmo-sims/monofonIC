@@ -209,8 +209,8 @@ int run( config_file& the_config )
     const real_t astart = 1.0/(1.0+zstart);
     const real_t volfac(std::pow(boxlen / ngrid / 2.0 / M_PI, 1.5));
 
-    the_cosmo_calc->write_powerspectrum(astart, "input_powerspec.txt" );
-    the_cosmo_calc->write_transfer("input_transfer.txt" );
+    the_cosmo_calc->write_powerspectrum(astart, the_config.get_path_relative_to_config("input_powerspec.txt"));
+    the_cosmo_calc->write_transfer(the_config.get_path_relative_to_config("input_transfer.txt"));
 
     // the_cosmo_calc->compute_sigma_bc();
     // abort();
@@ -345,6 +345,17 @@ int run( config_file& the_config )
         return ((bDoInversion)? real_t{-1.0} : real_t{1.0}) * wn / volfac;
     });
 
+    //--------------------------------------------------------------------
+    // Remove Corner modes or not by zeroing them
+    //--------------------------------------------------------------------
+
+    if( the_config.get_value_safe<bool>("setup", "DoRemoveCornerModes", false) ){
+        // remove corner modes
+        wnoise.apply_function_k_dep( [&](auto wn, auto k){
+            if( k.norm() > wnoise.kny_[0] ) return ccomplex_t(0.0,0.0);
+            return wn;
+        });
+    }
 
     //--------------------------------------------------------------------
     // Compute the LPT terms....
@@ -763,7 +774,7 @@ int run( config_file& the_config )
                 }, psi);
 
                 the_output_plugin->write_grid_data( rho, this_species, fluid_component::density );
-                rho.Write_PowerSpectrum("input_powerspec_sampled_evolved_semiclassical.txt");
+                rho.Write_PowerSpectrum(the_config.get_path_relative_to_config("input_powerspec_sampled_evolved_semiclassical.txt"));
                 rho.FourierTransformBackward();
                 
                 //======================================================================
@@ -954,7 +965,7 @@ int run( config_file& the_config )
                     phi.FourierTransformForward();
                     tmp.FourierTransformForward(false);
                     tmp.assign_function_of_grids_kdep( []( auto kvec, auto pphi ){
-                        return - kvec.norm_squared() *  pphi;
+                        return kvec.norm_squared() *  pphi;
                     }, phi);
                     tmp.Write_PowerSpectrum("input_powerspec_sampled_SPT.txt");
                     tmp.FourierTransformBackward();

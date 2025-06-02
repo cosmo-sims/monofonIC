@@ -458,7 +458,7 @@ public:
   {
     this->tf_isnormalised_ = true;
 
-    ofs_class_input_.open("input_class_parameters.ini", std::ios::trunc);
+    ofs_class_input_.open(cf.get_path_relative_to_config("input_class_parameters.ini"), std::ios::trunc);
 
     // all cosmological parameters need to be passed through the_cosmo_calc
     

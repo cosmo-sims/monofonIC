@@ -148,6 +148,12 @@ int main( int argc, char** argv )
 
     // open the configuration file 
     config_file the_config(argv[1]);
+    std::string log_filename = the_config.get_path_relative_to_config("log.txt");
+    music::logger::set_output(log_filename);
+    music::ilog << "                         argv[1] : " << argv[1] << std::endl;
+    music::ilog << "                 config_basename : " << the_config.get_path_relative_to_config("") << std::endl;
+    music::ilog << "                        log file : " << log_filename << std::endl;
+    music::ilog << "-------------------------------------------------------------------------------" << std::endl;
 
     //------------------------------------------------------------------------------
     // Set up FFTW
