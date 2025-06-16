@@ -65,6 +65,7 @@ private:
   interpolated_function_1d<true, true, false> delta_c_, delta_b_, delta_n_, delta_m_, theta_c_, theta_b_, theta_n_, theta_m_;
   interpolated_function_1d<true, true, false> delta_c0_, delta_b0_, delta_n0_, delta_m0_, theta_c0_, theta_b0_, theta_n0_, theta_m0_;
 
+  bool use_matter_;
   double zstart_, ztarget_, astart_, atarget_, kmax_, kmin_, h_, tnorm_;
 
   
@@ -84,7 +85,7 @@ private:
     //--- general parameters ------------------------------------------
     add_class_parameter("z_max_pk", std::max(std::max(zstart_, ztarget_),199.0)); // use 1.2 as safety
     add_class_parameter("P_k_max_h/Mpc", std::max(2.0,kmax_));
-    add_class_parameter("output", "dTk,vTk");
+    add_class_parameter("output", "dTk,vTk,mTk,mPk");
     add_class_parameter("extra metric transfer functions","yes");
     // add_class_parameter("lensing", "no");
 
@@ -99,7 +100,7 @@ private:
     add_class_parameter("Omega_cdm", cosmo_params_.get("Omega_c"));
     add_class_parameter("Omega_k", cosmo_params_.get("Omega_k"));
     // add_class_parameter("Omega_fld", 0.0);
-    // add_class_parameter("Omega_scf", 0.0);
+    add_class_parameter("Omega_scf", 0.0);
 
 
     // add_class_parameter("fluid_equation_of_state","CLP");
@@ -402,12 +403,12 @@ private:
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cdm, tau, &d_cdm[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_b, tau, &d_b[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_ncdm1, tau, &d_ncdm[0]);
-    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_m, tau, &d_tot[0]);
+    call_perturb_sources_at_tau(index_md, 0, use_matter_? pt_.index_tp_delta_m : pt_.index_tp_delta_cb, tau, &d_tot[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_b, tau, &t_b[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_ncdm1, tau, &t_ncdm[0]);
-    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_m, tau, &t_tot[0]);
+    call_perturb_sources_at_tau(index_md, 0, use_matter_? pt_.index_tp_theta_m : pt_.index_tp_theta_cb, tau, &t_tot[0]);
 
-    //
+    // metric perturbations
     std::vector<double> h_prime(pt_.k_size[index_md],0.0), eta_prime(pt_.k_size[index_md],0.0);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_eta_prime, tau, &eta_prime[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_h_prime, tau, &h_prime[0]);
@@ -461,7 +462,8 @@ public:
     ofs_class_input_.open(cf.get_path_relative_to_config("input_class_parameters.ini"), std::ios::trunc);
 
     // all cosmological parameters need to be passed through the_cosmo_calc
-    
+
+    use_matter_ = pcf_->get_value_safe<double>("cosmology", "class_use_matter", false);    
     ztarget_ = pcf_->get_value_safe<double>("cosmology", "ztarget", 0.0);
     atarget_ = 1.0 / (1.0 + ztarget_);
     zstart_ = pcf_->get_value<double>("setup", "zstart");
