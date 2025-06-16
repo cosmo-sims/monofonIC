@@ -1,0 +1,31 @@
+ [0m                         argv[1] : default_config.conf
+[0m [0m                 config_basename : default_config_
+[0m [0m                        log file : default_config_log.txt
+[0m [0m-------------------------------------------------------------------------------
+[0m [0mCPU vendor string                : AMD Ryzen 5 PRO 5650U with Radeon Graphics
+[0m [0mAvailable HW threads / task      : 12 (8 used)
+[0m [0mTotal system memory (phys)       : 46995 Mb
+[0m [0mUsed system memory (phys)        : Max: 32497 Mb, Min: 32497 Mb
+[0m [0mAvailable system memory (phys)   : Max: 14498 Mb, Min: 14498 Mb
+[0m [0mMPI is enabled                   : yes (1 tasks)
+[0m [0mMPI supports multi-threading     : yes
+[0m [0mOS/Kernel version                : Linux version 6.12 build 0
+[0m [0mFFTW version                     : fftw-3.3.10-sse2-avx
+[0m [0mFFTW supports multi-threading    : yes
+[0m [0mFFTW mode                        : FFTW_ESTIMATE
+[0m [0m-------------------------------------------------------------------------------
+[0m [0mRandom number generator plugin   : NGENIC
+[0m [0m-------------------------------------------------------------------------------
+[0m [0mLoading cosmological parameter set 'Planck2018EE+BAO+SN'...
+[0m [0mCosmological parameters are: 
+[0m [0m h        = 0.67742         A_s      = 2.1064e-09      n_s     = 0.96822         
+[0m [0m Omega_c  = 0.259605        Omega_b  = 0.0488911       Omega_m = 0.3099          
+[0m [0m Omega_r  = 7.89282e-05     Omega_nu = 0.00140378      ∑m_nu   = 0.06eV
+[0m [0m Omega_DE = 0.690021        w_0      = -1              w_a     = 0               
+[0m[33mWarning :  Radiation enabled, using Omega_r=7.89282e-05 internally for backscaling.
+[0m[33mWarning :  Make sure your sim code supports this, otherwise set [cosmology] / ZeroRadiation=true.
+[0m [0mLinear growth factors: D+_target = 0.360782, D+_start = 0.0511631
+[0m [0m-------------------------------------------------------------------------------
+[0m [0mTransfer function plugin         : CLASS
+[0m [0mCLASS: Using A_s=2.1064e-09 to normalise the transfer function.
+[0m [0mComputing transfer function via ClassEngine...

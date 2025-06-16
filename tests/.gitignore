@@ -1,0 +1,8 @@
+*.hdf5
+*.ini
+*_input_powerspec.txt
+*_input_powerspec_sampled_evolved_semiclassical.txt
+*_log.txt
+*_input_transfer.txt
+.idea/
+!*ref*

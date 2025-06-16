@@ -1,0 +1,5 @@
+pytest
+pytest-check
+numpy
+h5py
+matplotlib
