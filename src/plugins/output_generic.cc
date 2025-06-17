@@ -28,6 +28,7 @@ private:
 	std::string get_field_name( const cosmo_species &s, const fluid_component &c );
 protected:
 	bool out_eulerian_;
+    unsigned hdf5_compression_level_;
 public:
 	//! constructor
 	explicit generic_output_plugin(config_file &cf, std::unique_ptr<cosmology::calculator> &pcc )
@@ -41,6 +42,8 @@ public:
 		
 
 		out_eulerian_   = cf_.get_value_safe<bool>("output", "generic_out_eulerian",false);
+
+        hdf5_compression_level_ = cf_.get_value_safe<unsigned>("output", "hdf5CompressionLevel", 0);
 
 		if( CONFIG::MPI_task_rank == 0 )
 		{
@@ -117,7 +120,7 @@ std::string generic_output_plugin::get_field_name( const cosmo_species &s, const
 void generic_output_plugin::write_grid_data(const Grid_FFT<real_t> &g, const cosmo_species &s, const fluid_component &c ) 
 {
 	std::string field_name = this->get_field_name( s, c );
-	g.Write_to_HDF5(fname_, field_name);
+	g.Write_to_HDF5(fname_, field_name, hdf5_compression_level_);
 	music::ilog << interface_name_ << " : Wrote field \'" << field_name << "\' to file \'" << fname_ << "\'" << std::endl;
 }
 
