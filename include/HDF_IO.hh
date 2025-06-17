@@ -624,7 +624,7 @@ inline void HDFReadGroupAttribute( const std::string Filename, const std::string
 }
 
 template< typename T >
-inline void HDFWriteDataset( const std::string Filename, const std::string ObjName, const std::vector<T> &Data )
+inline void HDFWriteDataset( const std::string Filename, const std::string ObjName, const std::vector<T> &Data, const bool filter = false, const unsigned compression_level = 0 )
 {
 
   hid_t
@@ -641,14 +641,33 @@ inline void HDFWriteDataset( const std::string Filename, const std::string ObjNa
 
   HDF_Dims                = Data.size();
   HDF_DataspaceID         = H5Screate_simple(1, &HDF_Dims, NULL);
+  hid_t dcpl_id = H5P_DEFAULT;
+  if (filter)
+  {
+    dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+
+    // 1MB chunking
+    hsize_t HDF_Dims_chunk[1] = {1024 * 1024 / sizeof(T)};
+    H5Pset_chunk(dcpl_id, 1, HDF_Dims_chunk);
+
+    if (compression_level) {
+      H5Pset_shuffle(dcpl_id);
+      H5Pset_deflate(dcpl_id, compression_level);
+    }
+    // fletcher crc checksum
+    H5Pset_fletcher32(dcpl_id);
+  }
   HDF_DatasetID           = H5Dcreate( HDF_FileID, ObjName.c_str(), HDF_Type,
-                                       HDF_DataspaceID, H5P_DEFAULT );
+                                       HDF_DataspaceID, dcpl_id );
   H5Dwrite( HDF_DatasetID, HDF_Type, H5S_ALL, H5S_ALL,
             H5P_DEFAULT, &Data[0] );
   H5Dclose( HDF_DatasetID );
   H5Sclose( HDF_DataspaceID );
 
   H5Fclose( HDF_FileID );
+  if (filter){
+      H5Pclose(dcpl_id);
+  }
 }
 
 template< typename T >
@@ -847,7 +866,7 @@ inline void HDFWriteDataset3Ds( const std::string Filename, const std::string Ob
 
 
 template< typename T >
-inline void HDFWriteDatasetVector( const std::string Filename, const std::string ObjName, const std::vector<T> &Data )
+inline void HDFWriteDatasetVector( const std::string Filename, const std::string ObjName, const std::vector<T> &Data, const bool filter = false, const unsigned compression_level = 0 )
 {
 
   hid_t
@@ -874,18 +893,37 @@ inline void HDFWriteDatasetVector( const std::string Filename, const std::string
   }
 
   HDF_DataspaceID         = H5Screate_simple(2, HDF_Dims, NULL);
+  hid_t dcpl_id = H5P_DEFAULT;
+  if (filter)
+    {
+      dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+
+      // 1MB chunking
+      hsize_t HDF_Dims_chunk[2] = {256 * 1024 / sizeof(T), 3};
+      H5Pset_chunk(dcpl_id, 2, HDF_Dims_chunk);
+      if (compression_level) {
+        H5Pset_shuffle(dcpl_id);
+        H5Pset_deflate(dcpl_id, compression_level);
+      }
+      // fletcher crc checksum
+      H5Pset_fletcher32(dcpl_id);
+    }
+
   HDF_DatasetID           = H5Dcreate( HDF_FileID, ObjName.c_str(), HDF_Type,
-                                       HDF_DataspaceID, H5P_DEFAULT );
+                                       HDF_DataspaceID, dcpl_id );
   H5Dwrite( HDF_DatasetID, HDF_Type, H5S_ALL, H5S_ALL,
             H5P_DEFAULT, &Data[0] );
   H5Dclose( HDF_DatasetID );
   H5Sclose( HDF_DataspaceID );
 
+  if (filter){
+    H5Pclose(dcpl_id);
+  }
   H5Fclose( HDF_FileID );
 }
 
 template< typename T >
-inline void HDFCreateEmptyDataset( const std::string Filename, const std::string ObjName, const size_t num_particles, const bool filter = false)
+inline void HDFCreateEmptyDataset( const std::string Filename, const std::string ObjName, const size_t num_particles, const bool filter = false, const unsigned compression_level = 0 )
 {
 
   hid_t
@@ -902,10 +940,14 @@ inline void HDFCreateEmptyDataset( const std::string Filename, const std::string
   if (filter)
     {
       // 1MB chunking
-      hsize_t HDF_Dims[1] = {1024 * 1024 / sizeof(T)};
-      H5Pset_chunk(HDF_Prop, 1, HDF_Dims);
+      hsize_t HDF_Dims_chunk[1] = {1024 * 1024 / sizeof(T)};
+      H5Pset_chunk(HDF_Prop, 1, HDF_Dims_chunk);
 
-      // md5 checksum
+      if (compression_level) {
+        H5Pset_shuffle(HDF_Prop);
+        H5Pset_deflate(HDF_Prop, compression_level);
+      }
+      // fletcher crc checksum
       H5Pset_fletcher32(HDF_Prop);
     }
 
@@ -925,7 +967,7 @@ inline void HDFCreateEmptyDataset( const std::string Filename, const std::string
 }
 
 template< typename T >
-inline void HDFCreateEmptyDatasetVector( const std::string Filename, const std::string ObjName, const size_t num_particles, const bool filter = false)
+inline void HDFCreateEmptyDatasetVector( const std::string Filename, const std::string ObjName, const size_t num_particles, const bool filter = false, const unsigned compression_level = 0 )
 {
 
     hid_t
@@ -942,10 +984,14 @@ inline void HDFCreateEmptyDatasetVector( const std::string Filename, const std::
   if (filter)
     {
       // ~1MB chunking
-      hsize_t HDF_Dims[2] = {256 * 1024 / sizeof(T), 3};
-      H5Pset_chunk(HDF_Prop, 2, HDF_Dims);
+      hsize_t HDF_Dims_chunk[2] = {256 * 1024 / sizeof(T), 3};
+      H5Pset_chunk(HDF_Prop, 2, HDF_Dims_chunk);
 
-      // md5 checksum
+      if (compression_level) {
+        H5Pset_shuffle(HDF_Prop);
+        H5Pset_deflate(HDF_Prop, compression_level);
+      }
+      // fletcher crc checksum
       H5Pset_fletcher32(HDF_Prop);
     }
 
