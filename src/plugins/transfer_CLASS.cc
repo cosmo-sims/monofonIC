@@ -66,7 +66,7 @@ private:
   interpolated_function_1d<true, true, false> delta_c0_, delta_b0_, delta_n0_, delta_m0_, theta_c0_, theta_b0_, theta_n0_, theta_m0_;
 
   bool use_matter_;
-  double zstart_, ztarget_, astart_, atarget_, kmax_, kmin_, h_, tnorm_;
+  double zstart_, ztarget_, astart_, atarget_, kmax_, kmin_, h_, tnorm_, f_b_, f_c_;
 
   
   // std::unique_ptr<ClassEngine> the_ClassEngine_;
@@ -120,12 +120,19 @@ private:
     
     add_class_parameter("N_ur", cosmo_params_.get("N_ur"));
     add_class_parameter("N_ncdm", cosmo_params_.get("N_nu_massive"));
+    const double Tnu = std::pow(4./11.,1./3.);
+
     if( cosmo_params_.get("N_nu_massive") > 0 ){
       std::stringstream sstr;
       if( cosmo_params_.get("m_nu1") > 1e-9 ) sstr << cosmo_params_.get("m_nu1");
       if( cosmo_params_.get("m_nu2") > 1e-9 ) sstr << ", " << cosmo_params_.get("m_nu2");
       if( cosmo_params_.get("m_nu3") > 1e-9 ) sstr << ", " << cosmo_params_.get("m_nu3");
       add_class_parameter("m_ncdm", sstr.str().c_str());
+      sstr.str(std::string());
+      if( cosmo_params_.get("m_nu1") > 1e-9 ) sstr << Tnu;
+      if( cosmo_params_.get("m_nu2") > 1e-9 ) sstr << ", " << Tnu;
+      if( cosmo_params_.get("m_nu3") > 1e-9 ) sstr << ", " << Tnu;
+      add_class_parameter("T_ncdm", sstr.str().c_str());
     }
     
     // change above to enable
@@ -135,7 +142,7 @@ private:
 #endif
 
     //--- cosmological parameters, primordial -------------------------
-    add_class_parameter("P_k_ini type", "analytic_Pk");
+    // add_class_parameter("P_k_ini type", "analytic_Pk");
 
     if( cosmo_params_.get("A_s") > 0.0 ){
       add_class_parameter("A_s", cosmo_params_.get("A_s"));
@@ -156,14 +163,18 @@ private:
     add_class_parameter("compute damping scale", "yes");
     add_class_parameter("tol_perturbations_integration", 1.e-8);
     add_class_parameter("tol_background_integration", 1e-9);
+    add_class_parameter("l_max_g" , 31);
+    add_class_parameter("l_max_pol_g" , 31);
+    add_class_parameter("l_max_ur" , 31);
+    add_class_parameter("l_max_ncdm" , 31);
 
     // high precision options from cl_permille.pre:
     // precision file to be passed as input in order to achieve at least percent precision on scalar Cls
     add_class_parameter("hyper_flat_approximation_nu", 7000.);
-    add_class_parameter("transfer_neglect_delta_k_S_t0", 0.17);
-    add_class_parameter("transfer_neglect_delta_k_S_t1", 0.05);
-    add_class_parameter("transfer_neglect_delta_k_S_t2", 0.17);
-    add_class_parameter("transfer_neglect_delta_k_S_e", 0.13);
+    // add_class_parameter("transfer_neglect_delta_k_S_t0", 0.17);
+    // add_class_parameter("transfer_neglect_delta_k_S_t1", 0.05);
+    // add_class_parameter("transfer_neglect_delta_k_S_t2", 0.17);
+    // add_class_parameter("transfer_neglect_delta_k_S_e", 0.13);
     add_class_parameter("delta_l_max", 1000);
     int class_verbosity = 0;
 
@@ -403,10 +414,10 @@ private:
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cdm, tau, &d_cdm[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_b, tau, &d_b[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_ncdm1, tau, &d_ncdm[0]);
-    call_perturb_sources_at_tau(index_md, 0, use_matter_? pt_.index_tp_delta_m : pt_.index_tp_delta_cb, tau, &d_tot[0]);
+    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cb, tau, &d_tot[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_b, tau, &t_b[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_ncdm1, tau, &t_ncdm[0]);
-    call_perturb_sources_at_tau(index_md, 0, use_matter_? pt_.index_tp_theta_m : pt_.index_tp_theta_cb, tau, &t_tot[0]);
+    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_cb, tau, &t_tot[0]);
 
     // metric perturbations
     std::vector<double> h_prime(pt_.k_size[index_md],0.0), eta_prime(pt_.k_size[index_md],0.0);
@@ -443,11 +454,11 @@ private:
       d_cdm[i]  = -d_cdm[i] * ik2;
       d_b[i]    = -d_b[i] * ik2;
       d_ncdm[i] = -d_ncdm[i] * ik2;
-      d_tot[i]  = -d_tot[i] * ik2;
+      d_tot[i]  = use_matter_? -d_tot[i] * ik2 : (f_c_*d_cdm[i]+f_b_*d_b[i]);
       t_cdm[i]  = -t_cdm[i] * ik2;
       t_b[i]    = -t_b[i] * ik2;
       t_ncdm[i] = -t_ncdm[i] * ik2;
-      t_tot[i]  = -t_tot[i] * ik2;
+      t_tot[i]  = use_matter_? -t_tot[i] * ik2 : (f_c_*t_cdm[i]+f_b_*t_b[i]);
     }
 
     return _SUCCESS_;
@@ -463,13 +474,15 @@ public:
 
     // all cosmological parameters need to be passed through the_cosmo_calc
 
-    use_matter_ = pcf_->get_value_safe<double>("cosmology", "class_use_matter", false);    
+    use_matter_ = pcf_->get_value_safe<bool>("cosmology", "class_use_matter", false);    
     ztarget_ = pcf_->get_value_safe<double>("cosmology", "ztarget", 0.0);
     atarget_ = 1.0 / (1.0 + ztarget_);
     zstart_ = pcf_->get_value<double>("setup", "zstart");
     astart_ = 1.0 / (1.0 + zstart_);
 
-    h_ = cosmo_params_["h"];
+    f_b_ = cosmo_params_["Omega_b"] / (cosmo_params_["Omega_b"] + cosmo_params_["Omega_c"]);
+    f_c_ = cosmo_params_["Omega_c"] / (cosmo_params_["Omega_b"] + cosmo_params_["Omega_c"]);
+    h_   = cosmo_params_["h"];
     
     if (cosmo_params_["A_s"] > 0.0) {
       music::ilog << "CLASS: Using A_s=" << cosmo_params_["A_s"] << " to normalise the transfer function." << std::endl;
