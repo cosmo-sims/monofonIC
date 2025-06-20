@@ -257,6 +257,12 @@ public:
                     // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, theta_baryon0)* Dplus_start_ / Dplus_target_, 2.0)
                     << std::endl;
             }
+            if (ofs.fail()) {
+                std::string message = "Could not write to file: " + fname;
+                music::elog << message << std::endl;
+                throw std::runtime_error(message);
+            }
+            ofs.close();
         }
         music::ilog << "Wrote power spectrum at a=" << a << " to file \'" << fname << "\'" << std::endl;
     }
@@ -304,6 +310,12 @@ public:
                     << std::setw(20) << std::setprecision(10) << tbc / std::pow( Dplus_start_ / Dplus_target_, 0.5 )
                     << std::endl;
             }
+            if (ofs.fail()) {
+                std::string message = "Could not write to file: " + fname;
+                music::elog << message << std::endl;
+                throw std::runtime_error(message);
+            }
+            ofs.close();
         }
         music::ilog << "Wrote input transfer functions at a=" << astart_ << " to file \'" << fname << "\'" << std::endl;
     }
