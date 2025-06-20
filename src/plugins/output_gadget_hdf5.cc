@@ -65,6 +65,7 @@ protected:
   real_t lunit_, vunit_, munit_;
   bool blongids_;
   bool bgadget2_compatibility_;
+  unsigned hdf5_compression_level_;
   std::string this_fname_;
 
 public:
@@ -89,6 +90,8 @@ public:
 
     bgadget2_compatibility_ = cf_.get_value_safe<bool>("output", "Gadget2Compatibility", false);
     music::ilog << std::setw(32) << std::left << "Gadget2Compatibility" << " : " << (bgadget2_compatibility_? "yes" : "no") << std::endl;
+
+    hdf5_compression_level_ = cf_.get_value_safe<unsigned>("output", "hdf5CompressionLevel", 0);
 
     for (int i = 0; i < 6; ++i)
     {
@@ -276,27 +279,27 @@ public:
     //... write positions and velocities.....
     if (this->has_64bit_reals())
     {
-      HDFWriteDatasetVector(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/Coordinates"), pc.positions64_);
-      HDFWriteDatasetVector(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/Velocities"), pc.velocities64_);
+      HDFWriteDatasetVector(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/Coordinates"), pc.positions64_, true, hdf5_compression_level_);
+      HDFWriteDatasetVector(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/Velocities"), pc.velocities64_, true, hdf5_compression_level_);
     }
     else
     {
-      HDFWriteDatasetVector(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/Coordinates"), pc.positions32_);
-      HDFWriteDatasetVector(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/Velocities"), pc.velocities32_);
+      HDFWriteDatasetVector(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/Coordinates"), pc.positions32_, true, hdf5_compression_level_);
+      HDFWriteDatasetVector(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/Velocities"), pc.velocities32_, true, hdf5_compression_level_);
     }
 
     //... write ids.....
     if (this->has_64bit_ids())
-      HDFWriteDataset(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/ParticleIDs"), pc.ids64_);
+      HDFWriteDataset(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/ParticleIDs"), pc.ids64_, true, hdf5_compression_level_);
     else
-      HDFWriteDataset(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/ParticleIDs"), pc.ids32_);
+      HDFWriteDataset(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/ParticleIDs"), pc.ids32_, true, hdf5_compression_level_);
 
     //... write masses.....
     if( pc.bhas_individual_masses_ ){
       if (this->has_64bit_reals()){
-        HDFWriteDataset(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/Masses"), pc.mass64_);
+        HDFWriteDataset(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/Masses"), pc.mass64_, true, hdf5_compression_level_);
       }else{
-        HDFWriteDataset(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/Masses"), pc.mass32_);
+        HDFWriteDataset(this_fname_, std::string("PartType") + std::to_string(sid) + std::string("/Masses"), pc.mass32_, true, hdf5_compression_level_);
       }
     }
 

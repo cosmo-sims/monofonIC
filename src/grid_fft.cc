@@ -667,7 +667,7 @@ void Grid_FFT<data_t, bdistributed>::Read_from_HDF5(const std::string Filename, 
 }
 
 template <typename data_t, bool bdistributed>
-void Grid_FFT<data_t, bdistributed>::Write_to_HDF5(std::string fname, std::string datasetname) const
+void Grid_FFT<data_t, bdistributed>::Write_to_HDF5(std::string fname, std::string datasetname, const unsigned compression_level) const
 {
     // FIXME: cleanup duplicate code in this function!
     if (!bdistributed && CONFIG::MPI_task_rank == 0)
@@ -885,12 +885,22 @@ void Grid_FFT<data_t, bdistributed>::Write_to_HDF5(std::string fname, std::strin
         else if (typeid(data_t) == typeid(std::complex<long double>))
             dtype_id = H5T_NATIVE_LDOUBLE;
 
+        hid_t dcpl = H5P_DEFAULT;
+        if (size(1) >= 64) {
+            dcpl = H5Pcreate(H5P_DATASET_CREATE);
+            hsize_t chunk_dims[3] = {64, 64, 64};
+            H5Pset_chunk(dcpl, 3, chunk_dims);
+            H5Pset_shuffle(dcpl);
+            H5Pset_deflate(dcpl, compression_level);
+            H5Pset_fletcher32(dcpl);
+        }
+
 #if defined(USE_MPI) && !defined(USE_MPI_IO)
         if (itask == 0)
         {
             filespace = H5Screate_simple(3, count, NULL);
             dset_id = H5Dcreate2(file_id, datasetname.c_str(), dtype_id, filespace,
-                                 H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+                                 H5P_DEFAULT, dcpl, H5P_DEFAULT);
             H5Sclose(filespace);
         }
         else
@@ -900,7 +910,7 @@ void Grid_FFT<data_t, bdistributed>::Write_to_HDF5(std::string fname, std::strin
 #else
     filespace = H5Screate_simple(3, count, NULL);
     dset_id = H5Dcreate2(file_id, datasetname.c_str(), dtype_id, filespace,
-                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+                         H5P_DEFAULT, dcpl, H5P_DEFAULT);
     H5Sclose(filespace);
 #endif
 
@@ -977,7 +987,7 @@ void Grid_FFT<data_t, bdistributed>::Write_to_HDF5(std::string fname, std::strin
             {
                 filespace = H5Screate_simple(3, count, NULL);
                 dset_id = H5Dcreate2(file_id, datasetname.c_str(), dtype_id, filespace,
-                                     H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+                                     H5P_DEFAULT, dcpl, H5P_DEFAULT);
                 H5Sclose(filespace);
             }
             else
@@ -987,7 +997,7 @@ void Grid_FFT<data_t, bdistributed>::Write_to_HDF5(std::string fname, std::strin
 #else
         filespace = H5Screate_simple(3, count, NULL);
         dset_id = H5Dcreate2(file_id, datasetname.c_str(), dtype_id, filespace,
-                             H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+                             H5P_DEFAULT, dcpl, H5P_DEFAULT);
         H5Sclose(filespace);
 #endif
 
@@ -1040,6 +1050,7 @@ void Grid_FFT<data_t, bdistributed>::Write_to_HDF5(std::string fname, std::strin
         }
 
         H5Fclose(file_id);
+        H5Pclose(dcpl);
 
 #if defined(USE_MPI) && !defined(USE_MPI_IO)
     }

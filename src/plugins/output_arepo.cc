@@ -63,6 +63,7 @@ protected:
   header_t header_;
   real_t lunit_, vunit_, munit_;
   bool blongids_;
+  unsigned hdf5_compression_level_;
   std::string this_fname_;
   double Tini_;
   unsigned pmgrid_;
@@ -90,6 +91,8 @@ public:
     
     blongids_ = cf_.get_value_safe<bool>("output", "UseLongids", false);
     num_simultaneous_writers_ = cf_.get_value_safe<int>("output", "NumSimWriters", num_files_);
+
+    hdf5_compression_level_ = cf_.get_value_safe<unsigned>("output", "hdf5CompressionLevel", 0);
 
     for (int i = 0; i < 6; ++i)
     {

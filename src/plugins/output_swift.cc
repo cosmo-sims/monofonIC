@@ -44,6 +44,7 @@ protected:
   real_t lunit_, vunit_, munit_;
   real_t boxsize_, hubble_param_, astart_, zstart_;
   bool blongids_, bdobaryons_;
+  unsigned hdf5_compression_level_;
 
   std::array<uint64_t,7> npart_;
   std::array<uint32_t,7> npartTotal_, npartTotalHighWord_;
@@ -75,6 +76,7 @@ public:
     munit_ = rhoc * std::pow(boxsize_, 3) / hubble_param_; // final units will be in 1e10 M_sol
 
     blongids_ = cf_.get_value_safe<bool>("output", "UseLongids", true);
+    hdf5_compression_level_ = cf_.get_value_safe<unsigned>("output", "hdf5CompressionLevel", 0);
     bdobaryons_ = cf_.get_value<bool>("setup","DoBaryons");
 
     for (int i = 0; i < 7; ++i)
@@ -262,30 +264,30 @@ public:
 
       if (this->has_64bit_reals())
       {
-	HDFCreateEmptyDatasetVector<double>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/Coordinates"), global_num_particles, true);
-	HDFCreateEmptyDatasetVector<double>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/Velocities"), global_num_particles, true);
+	HDFCreateEmptyDatasetVector<double>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/Coordinates"), global_num_particles, true, hdf5_compression_level_);
+	HDFCreateEmptyDatasetVector<double>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/Velocities"), global_num_particles, true, hdf5_compression_level_);
       }
       else
       {
-	HDFCreateEmptyDatasetVector<float>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/Coordinates"), global_num_particles, true);
-	HDFCreateEmptyDatasetVector<float>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/Velocities"), global_num_particles, true);
+	HDFCreateEmptyDatasetVector<float>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/Coordinates"), global_num_particles, true, hdf5_compression_level_);
+	HDFCreateEmptyDatasetVector<float>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/Velocities"), global_num_particles, true, hdf5_compression_level_);
       }
 
       if (this->has_64bit_ids())
-	HDFCreateEmptyDataset<uint64_t>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/ParticleIDs"), global_num_particles, true);
+	HDFCreateEmptyDataset<uint64_t>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/ParticleIDs"), global_num_particles, true, hdf5_compression_level_);
       else
-	HDFCreateEmptyDataset<uint32_t>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/ParticleIDs"), global_num_particles, true);
+	HDFCreateEmptyDataset<uint32_t>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/ParticleIDs"), global_num_particles, true, hdf5_compression_level_);
 
       if (this->has_64bit_reals())
-	HDFCreateEmptyDataset<double>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/Masses"), global_num_particles, true);
+	HDFCreateEmptyDataset<double>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/Masses"), global_num_particles, true, hdf5_compression_level_);
       else
-	HDFCreateEmptyDataset<float>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/Masses"), global_num_particles, true);
+	HDFCreateEmptyDataset<float>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/Masses"), global_num_particles, true, hdf5_compression_level_);
 
       if( bdobaryons_ && s == cosmo_species::baryon) {
 
 	// note: despite this being a constant array we still need to handle it in a distributed way
-	HDFCreateEmptyDataset<write_real_t>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/InternalEnergy"), global_num_particles, true);
-	HDFCreateEmptyDataset<write_real_t>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/SmoothingLength"), global_num_particles, true);
+	HDFCreateEmptyDataset<write_real_t>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/InternalEnergy"), global_num_particles, true, hdf5_compression_level_);
+	HDFCreateEmptyDataset<write_real_t>(fname_, std::string("PartType") + std::to_string(sid) + std::string("/SmoothingLength"), global_num_particles, true, hdf5_compression_level_);
       }
 
       music::ilog << "Created empty arrays for PartType" << std::to_string(sid) << " into file " << fname_ << "." << std::endl;

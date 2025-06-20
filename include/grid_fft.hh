@@ -819,7 +819,7 @@ public:
     //! normalise field
     void ApplyNorm(void);
 
-    void Write_to_HDF5(std::string fname, std::string datasetname) const;
+    void Write_to_HDF5(std::string fname, std::string datasetname, unsigned compression_level = 0) const;
 
     void Read_from_HDF5( std::string fname, std::string datasetname );
 
