@@ -44,10 +44,7 @@ struct grid_interpolate
 
     if (is_distributed_trait)
     {
-      // this is broken currently, ghost zone update needs to be re-implemented
-      // since it is only used for GLASS ICs, these will be disabled.
-      //DISABLED://  update_ghosts( g );
-
+      update_ghosts( g );
     }
   }
 

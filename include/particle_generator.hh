@@ -111,9 +111,9 @@ namespace particle
                     size_t idxpart = off_p + i;
                     size_t idx_in_glass = idxpart % np_in_file;
                     size_t idxtile = idxpart / np_in_file;
-                    size_t tile_z = idxtile % (ntiles * ntiles);
-                    size_t tile_y = ((idxtile - tile_z) / ntiles) % ntiles;
-                    size_t tile_x = (((idxtile - tile_z) / ntiles) - tile_y) / ntiles;
+                    size_t tile_x = idxtile / (ntiles * ntiles);
+                    size_t tile_y = (idxtile / ntiles) % ntiles;
+                    size_t tile_z = idxtile % ntiles;
                     glass_posr[i][0] = std::fmod((glass_pos[3 * idx_in_glass + 0] / lglassbox + real_t(tile_x)) / ntiles * ng[0] + ng[0], ng[0]);
                     glass_posr[i][1] = std::fmod((glass_pos[3 * idx_in_glass + 1] / lglassbox + real_t(tile_y)) / ntiles * ng[1] + ng[1], ng[1]);
                     glass_posr[i][2] = std::fmod((glass_pos[3 * idx_in_glass + 2] / lglassbox + real_t(tile_z)) / ntiles * ng[2] + ng[2], ng[2]);
@@ -342,8 +342,6 @@ namespace particle
             }
             else if( lattice_type == lattice_glass )
             {
-                music::wlog << "Glass ICs will currently be incorrect due to disabled ghost zone updates! ";
-
                 glass_ptr_ = std::make_unique<glass>( cf, field );
                 particles_.allocate(glass_ptr_->size(), b64reals, b64ids, false);
 
