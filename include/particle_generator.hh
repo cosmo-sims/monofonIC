@@ -262,6 +262,14 @@ namespace particle
                 glass_ptr_ = std::make_unique<glass>( cf, field );
                 particles_.allocate(glass_ptr_->size(), b64reals, b64ids, false);
 
+                // Get global particle count
+#if defined(USE_MPI)
+                size_t local_num_p = glass_ptr_->size();
+                MPI_Allreduce( &local_num_p, &global_num_particles_, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD );
+#else
+                global_num_particles_ = glass_ptr_->size();
+#endif
+
                 #pragma omp parallel for
                 for (size_t i = 0; i < glass_ptr_->size(); ++i)
                 {
