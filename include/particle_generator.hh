@@ -19,6 +19,7 @@
 #include <math/vec3.hh>
 #include <grid_ghosts.hh>
 #include <grid_interpolate.hh>
+#include <glass_loader.hh>
 
 #if defined(USE_HDF5)
 #include "HDF_IO.hh"
@@ -67,91 +68,7 @@ namespace particle
     {
         protected:
 
-        struct glass
-        {
-            using data_t = typename field_t::data_t;
-            size_t num_p, off_p;
-            grid_interpolate<1, field_t> interp_;
-            std::vector<vec3> glass_posr;
-
-            glass( config_file& cf, const field_t &field )
-            : num_p(0), off_p(0), interp_( field )
-            {
-                std::vector<real_t> glass_pos;
-                real_t lglassbox = 1.0;
-
-                std::string glass_fname = cf.get_value<std::string>("setup", "GlassFileName");
-                size_t ntiles = cf.get_value<size_t>("setup", "GlassTiles");
-
-#if defined(USE_HDF5)
-                HDFReadGroupAttribute(glass_fname, "Header", "BoxSize", lglassbox);
-                HDFReadDataset(glass_fname, "/PartType1/Coordinates", glass_pos);
-#else
-                throw std::runtime_error("Class lattice requires HDF5 support. Enable and recompile.");
-#endif
-
-                size_t np_in_file = glass_pos.size() / 3;
-#if defined(USE_MPI)
-                num_p = np_in_file * ntiles * ntiles * ntiles / MPI::get_size();
-                off_p = MPI::get_rank() * num_p;
-#else
-                num_p = np_in_file * ntiles * ntiles * ntiles;
-                off_p = 0;
-#endif
-
-                music::ilog << "Glass file contains " << np_in_file << " particles." << std::endl;
-
-                glass_posr.assign(num_p, {0.0, 0.0, 0.0});
-
-                std::array<real_t, 3> ng({real_t(field.n_[0]), real_t(field.n_[1]), real_t(field.n_[2])});
-
-                #pragma omp parallel for
-                for (size_t i = 0; i < num_p; ++i)
-                {
-                    size_t idxpart = off_p + i;
-                    size_t idx_in_glass = idxpart % np_in_file;
-                    size_t idxtile = idxpart / np_in_file;
-                    size_t tile_x = idxtile / (ntiles * ntiles);
-                    size_t tile_y = (idxtile / ntiles) % ntiles;
-                    size_t tile_z = idxtile % ntiles;
-                    glass_posr[i][0] = std::fmod((glass_pos[3 * idx_in_glass + 0] / lglassbox + real_t(tile_x)) / ntiles * ng[0] + ng[0], ng[0]);
-                    glass_posr[i][1] = std::fmod((glass_pos[3 * idx_in_glass + 1] / lglassbox + real_t(tile_y)) / ntiles * ng[1] + ng[1], ng[1]);
-                    glass_posr[i][2] = std::fmod((glass_pos[3 * idx_in_glass + 2] / lglassbox + real_t(tile_z)) / ntiles * ng[2] + ng[2], ng[2]);
-                }
-
-#if defined(USE_MPI)
-                interp_.domain_decompose_pos(glass_posr);
-
-                num_p = glass_posr.size();
-                std::vector<size_t> all_num_p( MPI::get_size(), 0 );
-                MPI_Allgather( &num_p, 1, MPI_UNSIGNED_LONG_LONG, &all_num_p[0], 1, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD );
-                off_p = 0;
-                for( int itask=0; itask<=MPI::get_rank(); ++itask ){
-                    off_p += all_num_p[itask];
-                }
-#endif
-            }
-
-            void update_ghosts( const field_t &field )
-            {
-                interp_.update_ghosts( field );
-            }
-
-            data_t get_at( const vec3& x ) const noexcept
-            {
-                return interp_.get_cic_at( x );
-            }
-
-            size_t size() const noexcept
-            {
-                return num_p;
-            }
-
-            size_t offset() const noexcept
-            {
-                return off_p;
-            }
-        };
+        using glass = glass_loader<field_t>;
 
         std::unique_ptr<glass> glass_ptr_;
 
