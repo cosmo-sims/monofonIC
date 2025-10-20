@@ -96,7 +96,7 @@ namespace particle
                 // Rank 0 reads the chunk from HDF5 using existing HDFReadDatasetSlab function
                 if (myrank == 0)
                 {
-                    HDFReadDatasetSlab(glass_fname, "/PartType1/Coordinates",
+                    HDFReadVectorSlab(glass_fname, "/PartType1/Coordinates",
                                       chunk_offset, chunk_count, chunk_data);
                 }
 
