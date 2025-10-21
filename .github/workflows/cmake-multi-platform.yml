@@ -50,12 +50,15 @@ jobs:
         #  Install a CMake 3.0.2 version.
         sudo apt-get install git cmake pkg-config cmake-data -y --force-yes
         # Print the CMake version.
-        cmake --version   
+        cmake --version
         # Install the necessary libraries
         sudo apt-get install libfftw3-mpi-dev libfftw3-dev -y
         sudo apt-get install libgsl-dev -y
         sudo apt-get install libhdf5-serial-dev -y
         sudo apt-get install openmpi-bin libopenmpi-dev -y
+        # Install Python3 and h5py for test comparison
+        sudo apt-get install python3 python3-pip -y
+        pip3 install h5py numpy
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
@@ -71,8 +74,12 @@ jobs:
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
+    - name: Generate test references
+      # Generate reference HDF5 files for regression tests
+      working-directory: ${{ steps.strings.outputs.build-output-dir }}
+      run: bash ../tests/scripts/generate_references.sh
+
     - name: Test
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
-      # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
-      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-      run: ctest --build-config ${{ matrix.build_type }}
+      # Execute tests defined by the CMake configuration with verbose output on failure
+      run: ctest --build-config ${{ matrix.build_type }} --output-on-failure

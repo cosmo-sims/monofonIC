@@ -312,6 +312,11 @@ if(ENABLE_GENERICIO)
 endif()
 
 ########################################################################################################################
+# Regression tests
+enable_testing()
+add_subdirectory(tests)
+
+########################################################################################################################
 # CPU specifics
 if(APPLE)
     # prevent linking problems on recent MacOS, enable exceptions (disabled otherwise)
