@@ -56,8 +56,8 @@ for NTASKS in "${MPI_TASKS[@]}"; do
         # Single task - run without mpirun
         "$MONOFONIC_EXE" "$CONFIG_FILE" > "${TEMP_DIR}/log_np${NTASKS}.txt" 2>&1
     else
-        # Multiple tasks - use mpirun
-        mpirun -np "$NTASKS" "$MONOFONIC_EXE" "$CONFIG_FILE" > "${TEMP_DIR}/log_np${NTASKS}.txt" 2>&1
+        # Multiple tasks - use mpirun with --oversubscribe for CI environments with limited cores
+        mpirun --oversubscribe -np "$NTASKS" "$MONOFONIC_EXE" "$CONFIG_FILE" > "${TEMP_DIR}/log_np${NTASKS}.txt" 2>&1
     fi
 
     # Check that output was created (single file or multi-file format)
