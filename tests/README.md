@@ -284,49 +284,12 @@ If tests fail in CI:
 ✗ Performance regressions (not measured)
 ✗ Large-scale/convergence behavior (use full-scale tests)
 
-## Troubleshooting
-
-### Test fails with "Reference file not found"
-
-```bash
-cd build
-bash ../tests/scripts/generate_references.sh
-```
-
-### Test fails with "h5py not found"
-
-```bash
-pip3 install h5py numpy
-```
-
-### Tests pass locally but fail in CI
-
-- Check compiler differences (GCC version, flags)
-- Verify dependency versions match
-- Look for non-deterministic behavior (though tests use fixed seeds)
-
-### Comparison shows small differences in floats
-
-- If differences are at machine precision (~1e-15), this is expected
-- Default tolerance (1e-9) should handle cross-platform variations
-- If differences are larger, investigate the root cause before updating references
-
-### MPI-related test failures
-
-Current tests use `NumThreads = 1` and are designed for single-process execution.
-For MPI testing, consider adding separate MPI-specific test cases.
-
 ## Future Enhancements
 
 Potential improvements to the test suite:
 
-- [ ] Add MPI-parallel test cases
 - [ ] Test CLASS transfer function integration (separate from these fast tests)
-- [ ] Add convergence tests (comparing different resolutions)
-- [ ] Performance benchmarking framework
-- [ ] Test PANPHASIA RNG (requires license agreement)
 - [ ] Add glass initial conditions test
-- [ ] Test mode fixing and phase inversion options
 
 ## Questions or Issues?
 
