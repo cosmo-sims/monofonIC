@@ -1,11 +1,9 @@
-[![Test Suite (Regression & MPI)](https://github.com/ohahn/monofonIC_testing/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/ohahn/monofonIC_testing/actions/workflows/cmake-multi-platform.yml)
+[![Test Suite (Regression & MPI)](https://github.com/ohahn/monofonIC/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/ohahn/monofonIC/actions/workflows/cmake-multi-platform.yml)
 
 # MUSIC2 - monofonIC
-Modular high-precision IC generator for cosmological simulations. MUSIC2-monofonIC is for non-zoom full box ICs (use [MUSIC](https://bitbucket.org/ohahn/music) for zooms, MUSIC2 for zooms is in the works).
+Modular high-precision IC generator for cosmological simulations. MUSIC2-monofonIC is for non-zoom full box ICs (use [MUSIC](https://github.com/cosmo-sims/MUSIC2) for zooms).
 
 Note that this program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY.
-
-BEWARE: This software package is currently in a beta testing phase! Proceed with caution before using it for large-scale simulations.
 
 [The full manual is available here as a wiki](https://bitbucket.org/ohahn/monofonic/wiki/). Quick instructions can be found below.
 
@@ -89,7 +87,7 @@ If you want to build on macOS, then it is strongly recommended to use GNU (or In
 via homebrew and then configure cmake to use them instead of the macOS default compiler via
 
 ```
-  CC=gcc-9 CXX=g++-9 ccmake ..
+  CC=gcc-13 CXX=g++-13 ccmake ..
 ```
 
 This is necessary since Apple's compilers haven't supported OpenMP for years.
@@ -114,7 +112,7 @@ It will then run with 16 tasks times the number of threads per task specified in
 
 ## Test Suite
 
-monofonIC includes a comprehensive regression testing framework to catch breaking changes and ensure code reliability.
+monofonIC includes a basic regression testing framework to catch breaking changes and ensure code reliability.
 
 **Test Coverage:**
 - **5 Regression Tests**: Cover different LPT orders (1LPT, 2LPT, 3LPT), particle loads (sc, bcc), output formats (Generic, Gadget, SWIFT), and baryon physics
