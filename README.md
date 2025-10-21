@@ -62,7 +62,7 @@ We acknowledge support from the European Research Council (ERC) under the Europe
 Clone code including submodules (currently only CLASS is used as a submodule):
 
 ```
-  git clone https://<username>@bitbucket.org/ohahn/monofonic.git
+  git clone git@github.com:cosmo-sims/monofonIC.git
 ```
 
 Create build directory, configure, and build:
