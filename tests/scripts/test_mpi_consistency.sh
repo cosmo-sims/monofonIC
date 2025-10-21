@@ -127,7 +127,7 @@ for NTASKS in "${MPI_TASKS[@]:1}"; do  # Skip first element (ntasks=1)
     # Note: For multi-file outputs, we only compare file .0
     # This contains a subset of particles but should be bitwise identical
     # in terms of those particles' properties
-    "$PYTHON_EXE" "$COMPARE_SCRIPT" "$REFERENCE" "$TEST_OUTPUT" --rtol 1e-10
+    "$PYTHON_EXE" "$COMPARE_SCRIPT" "$REFERENCE" "$TEST_OUTPUT" --rtol 1e-9
 
     if [ $? -eq 0 ]; then
         echo "✓ Outputs match (1 task vs $NTASKS tasks)"

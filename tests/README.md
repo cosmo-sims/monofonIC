@@ -8,7 +8,7 @@ The test suite consists of:
 - **5 regression test configurations** covering different LPT orders, particle loads, and output formats
 - **1 MPI consistency test** that verifies identical results across different MPI task counts
 - **Reference HDF5 files** containing expected outputs
-- **Comparison script** that performs hybrid tolerance checking (exact for integers, relative tolerance for floats)
+- **Comparison script** that performs hybrid tolerance checking (exact for integers, 1e-9 relative tolerance for floats)
 - **CMake/CTest integration** for easy test execution
 - **GitHub Actions CI** support for automated testing
 
@@ -106,8 +106,8 @@ python3 ../tests/scripts/compare_hdf5.py \
 The `compare_hdf5.py` script uses **hybrid tolerance** for robust regression testing:
 
 - **Integer datasets** (IDs, particle counts): Exact bit-for-bit comparison
-- **Float datasets** (positions, velocities, masses): Relative tolerance (default: 1e-10)
-- **Attributes**: Exact comparison
+- **Float datasets** (positions, velocities, masses): Relative tolerance (default: 1e-9)
+- **Attributes**: Exact comparison (except build metadata like Git Tag)
 
 This approach ensures:
 - Strict correctness for discrete quantities
@@ -308,7 +308,7 @@ pip3 install h5py numpy
 ### Comparison shows small differences in floats
 
 - If differences are at machine precision (~1e-15), this is expected
-- Default tolerance (1e-10) should handle cross-platform variations
+- Default tolerance (1e-9) should handle cross-platform variations
 - If differences are larger, investigate the root cause before updating references
 
 ### MPI-related test failures

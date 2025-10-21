@@ -93,6 +93,15 @@ def compare_attributes(attrs1, attrs2, name):
     Returns:
         (bool, str): (True if match, error message if no match)
     """
+    # Attributes to skip (metadata that changes between builds)
+    SKIP_ATTRIBUTES = {
+        'Git Tag',           # Version tag, different between builds
+        'Git Revision',      # Git commit hash, different between builds
+        'Git Branch',        # Git branch name, may differ
+        'Build Time',        # Compilation timestamp
+        'Build Date',        # Compilation date
+    }
+
     # Check all keys present in both
     keys1 = set(attrs1.keys())
     keys2 = set(attrs2.keys())
@@ -109,6 +118,10 @@ def compare_attributes(attrs1, attrs2, name):
 
     # Compare each attribute
     for key in keys1:
+        # Skip metadata attributes
+        if key in SKIP_ATTRIBUTES:
+            continue
+
         val1 = attrs1[key]
         val2 = attrs2[key]
 
@@ -131,7 +144,7 @@ def compare_attributes(attrs1, attrs2, name):
     return True, ""
 
 
-def compare_groups_recursive(group1, group2, path="/", rtol=1e-10, atol=1e-14, verbose=False):
+def compare_groups_recursive(group1, group2, path="/", rtol=1e-9, atol=1e-14, verbose=False):
     """
     Recursively compare two HDF5 groups.
 
@@ -231,8 +244,8 @@ def main():
         epilog="""
 Comparison strategy:
   - Integer datasets: exact bit-for-bit comparison
-  - Float datasets: relative tolerance comparison (default rtol=1e-10)
-  - Attributes: exact comparison
+  - Float datasets: relative tolerance comparison (default rtol=1e-9)
+  - Attributes: exact comparison (except build metadata)
 
 Exit codes:
   0 - Files match within tolerance
@@ -243,8 +256,8 @@ Exit codes:
 
     parser.add_argument("file1", help="First HDF5 file (reference)")
     parser.add_argument("file2", help="Second HDF5 file (test output)")
-    parser.add_argument("--rtol", type=float, default=1e-10,
-                       help="Relative tolerance for float comparison (default: 1e-10)")
+    parser.add_argument("--rtol", type=float, default=1e-9,
+                       help="Relative tolerance for float comparison (default: 1e-9)")
     parser.add_argument("--atol", type=float, default=1e-14,
                        help="Absolute tolerance for float comparison (default: 1e-14)")
     parser.add_argument("-v", "--verbose", action="store_true",

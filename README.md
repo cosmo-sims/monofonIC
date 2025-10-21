@@ -138,4 +138,4 @@ ctest -R test_mpi_consistency --verbose
 ctest -L regression -LE mpi
 ```
 
-Tests use small 32³ grids and complete in ~2.5 seconds total. See `tests/README.md` for detailed documentation on adding new tests and regenerating references.
+Tests use small 32³ grids and complete in ~2.5 seconds total. Comparisons use hybrid tolerance: exact for integers, 1e-9 relative tolerance for floats. See `tests/README.md` for detailed documentation on adding new tests and regenerating references.
