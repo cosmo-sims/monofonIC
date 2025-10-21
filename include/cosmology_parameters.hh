@@ -147,6 +147,15 @@ namespace cosmology
                 for( auto entry : it->second ){
                     pmap_[entry.first] = entry.second;
                 }
+
+                // ensure both A_s and sigma_8 are initialized
+                // (one will be -1 if not in the predefined set)
+                if( pmap_.find("sigma_8") == pmap_.end() ){
+                    pmap_["sigma_8"] = -1.0;
+                }
+                if( pmap_.find("A_s") == pmap_.end() ){
+                    pmap_["A_s"] = -1.0;
+                }
             }
 
             //-------------------------------------------------------------------------------
