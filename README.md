@@ -5,7 +5,7 @@ Modular high-precision IC generator for cosmological simulations. MUSIC2-monofon
 
 Note that this program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY.
 
-[The full manual is available here as a wiki](https://bitbucket.org/ohahn/monofonic/wiki/). Quick instructions can be found below.
+[The full manual is available here as a wiki](https://github.com/cosmo-sims/monofonIC/wiki). Quick instructions can be found below.
 
 Currently supported features (the list is growing, so check back):
 
