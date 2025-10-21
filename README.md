@@ -103,7 +103,7 @@ as a simple argument, e.g. from within the build directory:
   ./monofonIC ../example.conf
 ```
 
-If you want to run with MPI, you need to enable MPI support via ccmake. Then you can launch in hybrid MPI+threads mode by 
+If you want to run with MPI, you need to enable MPI support via ccmake. Then you can launch in hybrid MPI+threads mode by
 specifying the desired number of threads per task in the config file, and the number of tasks to be launched via
 
 ```
@@ -111,3 +111,31 @@ specifying the desired number of threads per task in the config file, and the nu
 ```
 
 It will then run with 16 tasks times the number of threads per task specified in the config file.
+
+## Test Suite
+
+monofonIC includes a comprehensive regression testing framework to catch breaking changes and ensure code reliability.
+
+**Test Coverage:**
+- **5 Regression Tests**: Cover different LPT orders (1LPT, 2LPT, 3LPT), particle loads (sc, bcc), output formats (Generic, Gadget, SWIFT), and baryon physics
+- **1 MPI Consistency Test**: Verifies identical results across 1, 2, and 4 MPI tasks to catch parallelization bugs
+- **All tests run automatically** in GitHub Actions CI on every push and pull request
+
+**Running Tests Locally:**
+
+```bash
+# From build directory
+cd build
+
+# Generate reference files (first time only)
+bash ../tests/scripts/generate_references.sh
+
+# Run all tests
+ctest --output-on-failure
+
+# Run specific test category
+ctest -R test_mpi_consistency --verbose
+ctest -L regression -LE mpi
+```
+
+Tests use small 32³ grids and complete in ~2.5 seconds total. See `tests/README.md` for detailed documentation on adding new tests and regenerating references.
