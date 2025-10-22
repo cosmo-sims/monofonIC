@@ -143,41 +143,56 @@ namespace cosmology
                 }else{
                     music::ilog << "Loading cosmological parameter set \'" << it->first << "\'..." << std::endl;
                 }
+                // The order doesn't matter, so keep it in the order of the example.conf
+                std::array<std::string, 18> config_keys = {
+                    "Omega_m", "Omega_b", "Omega_L", "H0", "nspec", "n_s", "sigma_8", "A_s", "A_s", "Tcmb", "YHe",
+                    "k_p", "m_nu1", "m_nu2", "m_nu3", "N_ur", "w_0", "w_a"
+                };
+
+                for (const std::string &config_key: config_keys) {
+                    auto parameter_key = config_key;
+                    if (config_key == "H0") {
+                        parameter_key = "h";
+                    } else if (config_key == "nspec") {
+                        parameter_key = "n_s";
+                    } else if (config_key == "Omega_L") {
+                        parameter_key = "Omega_DE";
+                    }
+                    if (config_key == "N_ur") {
+                        if (
+                            cf.contains_key("cosmology/m_nu1") ||
+                            cf.contains_key("cosmology/m_nu2") ||
+                            cf.contains_key("cosmology/m_nu3")) {
+                            int N_nu_massive = int(it->second["m_nu1"] > 1e-9) + int(it->second["m_nu2"] > 1e-9) + int(
+                                                   it->second["m_nu3"] > 1e-9);
+
+                            const double N_ur = 3.046 - N_nu_massive;
+                            music::ilog << "Setting N_ur=" << N_ur << std::endl;
+                            it->second["N_ur"] = N_ur;
+                        }
+                    }
+                    if (cf.contains_key("cosmology/" + config_key)) {
+                        const auto original_parameter = it->second[parameter_key];
+                        auto replaced_parameter = cf.get_value_basic<double>("cosmology", config_key);
+                        if (parameter_key == "h") {
+                            replaced_parameter /= 100.0;
+                        }
+                        music::ilog << "Overriding parameter "<< std::setw(9) << std::left << parameter_key
+                                << ": " << original_parameter
+                                << " -> " << replaced_parameter << std::endl;
+                        it->second[parameter_key] = replaced_parameter;
+                        if (config_key == "sigma_8") {
+                            it->second["A_s"] = -1.0;
+                            music::ilog << "setting A_s=-1.0 as sigma_8 is set" << parameter_key << std::endl;
+                            // If sigma_8 and A_s is set, A_s wins
+                        }
+                    }
+                }
+
 
                 // copy pre-defined set in
                 for( auto entry : it->second ){
                     pmap_[entry.first] = entry.second;
-                }
-
-                // ensure both A_s and sigma_8 are initialized
-                // (one will be -1 if not in the predefined set)
-                if( pmap_.find("sigma_8") == pmap_.end() ){
-                    pmap_["sigma_8"] = -1.0;
-                }
-                if( pmap_.find("A_s") == pmap_.end() ){
-                    pmap_["A_s"] = -1.0;
-                }
-
-                // allow overriding any parameter from config file
-                // this enables testing different cosmological parameters while using a base parameter set
-                std::vector<std::string> override_params = {
-                    "h", "H0", "Omega_m", "Omega_b", "Omega_DE", "Omega_L",
-                    "w_0", "w_a", "n_s", "A_s", "sigma_8", "k_p",
-                    "YHe", "N_ur", "m_nu1", "m_nu2", "m_nu3", "Tcmb"
-                };
-
-                for( const auto& param : override_params ){
-                    if( cf.contains_key("cosmology", param) ){
-                        // handle special cases for parameter name aliases
-                        if( param == "H0" ){
-                            pmap_["h"] = cf.get_value<double>("cosmology", "H0") / 100.0;
-                        } else if( param == "Omega_L" ){
-                            pmap_["Omega_DE"] = cf.get_value<double>("cosmology", "Omega_L");
-                        } else {
-                            pmap_[param] = cf.get_value<double>("cosmology", param);
-                        }
-                    }
-                    music::ilog << "Overriding parameter \'" << param << "\' from config file." << std::endl;
                 }
             }
 
