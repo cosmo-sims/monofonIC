@@ -18,6 +18,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include <physical_constants.hh>
 #include <config_file.hh>
@@ -155,6 +156,28 @@ namespace cosmology
                 }
                 if( pmap_.find("A_s") == pmap_.end() ){
                     pmap_["A_s"] = -1.0;
+                }
+
+                // allow overriding any parameter from config file
+                // this enables testing different cosmological parameters while using a base parameter set
+                std::vector<std::string> override_params = {
+                    "h", "H0", "Omega_m", "Omega_b", "Omega_DE", "Omega_L",
+                    "w_0", "w_a", "n_s", "A_s", "sigma_8", "k_p",
+                    "YHe", "N_ur", "m_nu1", "m_nu2", "m_nu3", "Tcmb"
+                };
+
+                for( const auto& param : override_params ){
+                    if( cf.contains_key("cosmology", param) ){
+                        // handle special cases for parameter name aliases
+                        if( param == "H0" ){
+                            pmap_["h"] = cf.get_value<double>("cosmology", "H0") / 100.0;
+                        } else if( param == "Omega_L" ){
+                            pmap_["Omega_DE"] = cf.get_value<double>("cosmology", "Omega_L");
+                        } else {
+                            pmap_[param] = cf.get_value<double>("cosmology", param);
+                        }
+                    }
+                    music::ilog << "Overriding parameter \'" << param << "\' from config file." << std::endl;
                 }
             }
 
