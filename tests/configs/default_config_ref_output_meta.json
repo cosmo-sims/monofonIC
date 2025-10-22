@@ -1,0 +1,124 @@
+{
+  "attrs": {
+    "Header": {
+      "BoxSize": 442.85672108883705,
+      "Dimension": 3,
+      "Flag_Entropy_ICs": [
+        0
+      ],
+      "MassTable": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NumFilesPerSnapshot": [
+        1
+      ],
+      "NumPart_ThisFile": [
+        0,
+        262144,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "NumPart_Total": [
+        0,
+        262144,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "NumPart_Total_HighWord": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "Redshift": [
+        24.0
+      ],
+      "Time": [
+        0.04
+      ]
+    },
+    "ICs_parameters": {
+      "Baryons": 0,
+      "Baryons Relative Velocity": 0,
+      "Code": "MUSIC2 - monofonIC",
+      "Convolutions": "Orszag3/2",
+      "Cosmology Parameter Set": "Planck2018EE+BAO+SN",
+      "Grid Resolution": 64,
+      "LPT Order": 3,
+      "Mode Fixing": 0,
+      "Mode inversion": 0,
+      "PLT": "PLT corr. off",
+      "Particle Load": "sc",
+      "Precision": "double",
+      "Random Generator": "NGENIC",
+      "Target Redshift": 2.5,
+      "Transfer Function": "CLASS"
+    },
+    "PartType1": {},
+    "PartType1_Coordinates": {},
+    "PartType1_Masses": {},
+    "PartType1_ParticleIDs": {},
+    "PartType1_Velocities": {},
+    "Units": {
+      "Unit current in cgs (U_I)": 1.0,
+      "Unit length in cgs (U_L)": 3.08567758149e+24,
+      "Unit mass in cgs (U_M)": 1.98841e+43,
+      "Unit temperature in cgs (U_T)": 1.0,
+      "Unit time in cgs (U_t)": 3.08567758149e+19
+    }
+  },
+  "arrays": {
+    "PartType1_Coordinates": {
+      "shape": [
+        262144,
+        3
+      ],
+      "dtype": "float64",
+      "hash": "ac8627596c150858bacccf658a23f5302b4b79b667e593b544908f0c89dcb959"
+    },
+    "PartType1_Masses": {
+      "shape": [
+        262144
+      ],
+      "dtype": "float64",
+      "hash": "f0bbf7ca838b84c91ed1e931d8312c1a79780fadb85cb9358794f98fc175f0cb"
+    },
+    "PartType1_ParticleIDs": {
+      "shape": [
+        262144
+      ],
+      "dtype": "uint64",
+      "hash": "aed54e23940f33681343dd89d6823c5f33f5948cf4feb9a2c664815f3462a2a1"
+    },
+    "PartType1_Velocities": {
+      "shape": [
+        262144,
+        3
+      ],
+      "dtype": "float64",
+      "hash": "40cb91ca7cea7a84ada3758dfefeb21891bb18779642236a2a6df8cc02cc34ee"
+    },
+    "Units": {
+      "shape": [
+        0
+      ],
+      "dtype": "float64",
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}
