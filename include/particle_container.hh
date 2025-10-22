@@ -20,6 +20,7 @@
 #include <mpi.h>
 #endif
 
+#include <cstdint>
 #include <numeric>
 #include <vector>
 #include <general.hh>
