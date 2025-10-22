@@ -15,21 +15,32 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.13)
 set(PRGNAME monofonIC)
 project(monofonIC C CXX)
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -Wall -fno-omit-frame-pointer -g  -fsanitize=address")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -Wall -pedantic" CACHE STRING "Flags used by the compiler during Release builds." FORCE)
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -march=native -fno-omit-frame-pointer -Wall -pedantic" CACHE STRING "Flags used by the compiler during RelWithDebInfo builds." FORCE)
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O1 -march=native -DDEBUG -fno-omit-frame-pointer -Wall -pedantic" CACHE STRING "Flags used by the compiler during Debug builds." FORCE)
-set(CMAKE_CXX_FLAGS_DEBUGSANADD "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address " CACHE STRING "Flags used by the compiler during Debug builds with Sanitizer for address." FORCE)
-set(CMAKE_CXX_FLAGS_DEBUGSANUNDEF "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined" CACHE STRING "Flags used by the compiler during Debug builds with Sanitizer for undefineds." FORCE)
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}" CACHE STRING "Flags used by the compiler during Release builds." FORCE)
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}" CACHE STRING "Flags used by the compiler during RelWithDebInfo builds." FORCE)
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}" CACHE STRING "Flags used by the compiler during Debug builds." FORCE)
-set(CMAKE_C_FLAGS_DEBUGSANADD "${CMAKE_CXX_FLAGS_DEBUGSANADD}" CACHE STRING "Flags used by the compiler during Debug builds with Sanitizer for address." FORCE)
-set(CMAKE_C_FLAGS_DEBUGSANUNDEF "${CMAKE_CXX_FLAGS_DEBUGSANUNDEF}" CACHE STRING "Flags used by the compiler during Debug builds with Sanitizer for undefineds." FORCE)
+add_compile_options(
+       $<$<CONFIG:RELEASE>:-Ofast>
+       $<$<CONFIG:RELWITHDEBINFO>:-Ofast>
+       $<$<CONFIG:RELWITHDEBINFO>:-fno-omit-frame-pointer>
+       $<$<CONFIG:RELWITHDEBINFO>:-g>
+       $<$<CONFIG:DEBUG>:-O1>
+       $<$<CONFIG:DEBUG>:-g>
+       $<$<CONFIG:DEBUG>:-DDEBUG>
+)
+
+
+##set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -Wall -fno-omit-frame-pointer -g  -fsanitize=address")
+#set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -Wall -pedantic" CACHE STRING "Flags used by the compiler during Release builds." FORCE)
+#set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -march=native -fno-omit-frame-pointer -Wall -pedantic" CACHE STRING "Flags used by the compiler during #RelWithDebInfo builds." FORCE)
+#set(CMAKE_CXX_FLAGS_DEBUG "-g -O1 -march=native -DDEBUG -fno-omit-frame-pointer -Wall -pedantic" CACHE STRING "Flags used by the compiler during Debug builds." FORCE)
+#set(CMAKE_CXX_FLAGS_DEBUGSANADD "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address " CACHE STRING "Flags used by the compiler during Debug builds with Sanitizer for address." FORCE)
+#set(CMAKE_CXX_FLAGS_DEBUGSANUNDEF "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined" CACHE STRING "Flags used by the compiler during Debug builds with Sanitizer for undefineds." #FORCE)
+#set(CMAKE_C_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}" CACHE STRING "Flags used by the compiler during Release builds." FORCE)
+#set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}" CACHE STRING "Flags used by the compiler during RelWithDebInfo builds." FORCE)
+#set(CMAKE_C_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}" CACHE STRING "Flags used by the compiler during Debug builds." FORCE)
+#set(CMAKE_C_FLAGS_DEBUGSANADD "${CMAKE_CXX_FLAGS_DEBUGSANADD}" CACHE STRING "Flags used by the compiler during Debug builds with Sanitizer for address." FORCE)
+#set(CMAKE_C_FLAGS_DEBUGSANUNDEF "${CMAKE_CXX_FLAGS_DEBUGSANUNDEF}" CACHE STRING "Flags used by the compiler during Debug builds with Sanitizer for undefineds." FORCE)
 
 set(default_build_type "RelWithDebInfo")
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -43,7 +54,6 @@ endif()
 mark_as_advanced(CMAKE_CXX_FLAGS_DEBUGSANADD CMAKE_CXX_FLAGS_DEBUGSANUNDEF)
 mark_as_advanced(CMAKE_C_FLAGS_DEBUGSANADD CMAKE_C_FLAGS_DEBUGSANUNDEF)
 mark_as_advanced(CMAKE_EXECUTABLE_FORMAT CMAKE_OSX_ARCHITECTURES CMAKE_OSX_DEPLOYMENT_TARGET CMAKE_OSX_SYSROOT)
-
 
 find_package(PkgConfig REQUIRED)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${PROJECT_SOURCE_DIR}")
@@ -217,6 +227,9 @@ add_executable(${PRGNAME} ${SOURCES} ${PLUGINS})
 
 set_target_properties(${PRGNAME} PROPERTIES CXX_STANDARD 14)
 
+# Enable pedantic warnings for C++ files but not C files
+target_compile_options(${PRGNAME}  PRIVATE $<$<COMPILE_LANG_AND_ID:CXX,GNU>:-pedantic>)
+
 ########################################################################################################################
 # mpi flags and precision set up
 if(MPI_CXX_FOUND)
@@ -293,10 +306,10 @@ target_link_libraries(${PRGNAME} PRIVATE GSL::gsl)
 ########################################################################################################################
 # include CLASS
 option(ENABLE_CLASS "Enable CLASS support (as a submodule)." ON)
-  
+
 if(ENABLE_CLASS)
   include(${CMAKE_CURRENT_SOURCE_DIR}/external/class.cmake)
-  target_link_libraries(${PRGNAME} PRIVATE class::libclass_cpp)
+  target_link_libraries(${PRGNAME} PRIVATE class::libclass)
   target_compile_definitions(${PRGNAME} PRIVATE "USE_CLASS")
 endif()
 

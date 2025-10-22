@@ -134,8 +134,8 @@ public:
     vsprintf(out, str, argptr);
     va_end(argptr);
     std::string out_string = std::string(out);
-    out_string.erase(std::remove(out_string.begin(), out_string.end(), '\n'),
-                     out_string.end());
+    // out_string.erase(std::remove(out_string.begin(), out_string.end(), '\n'),
+    //                  out_string.end());
     (*this) << out_string << std::endl;
   }
 };
