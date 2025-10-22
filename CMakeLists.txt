@@ -20,8 +20,8 @@ set(PRGNAME monofonIC)
 project(monofonIC C CXX)
 
 add_compile_options(
-       $<$<CONFIG:RELEASE>:-Ofast>
-       $<$<CONFIG:RELWITHDEBINFO>:-Ofast>
+       $<$<CONFIG:RELEASE>:-O3>
+       $<$<CONFIG:RELWITHDEBINFO>:-O3>
        $<$<CONFIG:RELWITHDEBINFO>:-fno-omit-frame-pointer>
        $<$<CONFIG:RELWITHDEBINFO>:-g>
        $<$<CONFIG:DEBUG>:-O1>
