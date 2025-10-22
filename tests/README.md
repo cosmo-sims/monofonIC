@@ -260,9 +260,8 @@ If tests fail in CI:
 ### Why Small Tests?
 
 - **Fast execution**: 32³ grid completes in seconds
-- **Frequent CI runs**: Developers get quick feedback
+- **Frequent CI runs**: Fast detection of regressions
 - **Low storage**: Reference files are small (~few MB total)
-- **Still comprehensive**: Captures algorithm and output format correctness
 
 ### What Tests Catch
 
@@ -270,7 +269,6 @@ If tests fail in CI:
 ✓ Changes to particle positions/velocities
 ✓ Changes to LPT algorithm implementation
 ✓ Output format modifications
-✓ Baryon physics changes
 ✓ RNG differences
 ✓ Cosmology calculation errors
 
@@ -280,9 +278,6 @@ If tests fail in CI:
 ✓ MPI communication bugs
 ✓ Non-deterministic RNG across different MPI task counts
 
-**Not Covered:**
-✗ Performance regressions (not measured)
-✗ Large-scale/convergence behavior (use full-scale tests)
 
 ## Transfer Function Regression Tests
 
@@ -290,7 +285,7 @@ In addition to the full IC generation regression tests above, monofonIC includes
 
 ### Overview
 
-Transfer function tests validate that the transfer function plugins (CLASS, eisenstein, eisenstein_wdm) produce consistent outputs across code changes. These tests are faster than full IC generation tests and specifically target the cosmological parameter handling.
+Transfer function tests validate that the transfer function plugins (CLASS, eisenstein, eisenstein_wdm) produce consistent outputs across code changes (also of the CLASS codebase).
 
 ### Test Design
 
@@ -302,8 +297,7 @@ Transfer function tests validate that the transfer function plugins (CLASS, eise
 
 **Reference Format**: Text files (`tests/references/transfer/`)
 - Human-readable space-separated columns: k, δ_m, δ_c, δ_b, θ_m, θ_c, θ_b
-- Organized by plugin: `CLASS/`, `eisenstein/`, `eisenstein_wdm/`
-- Version-control friendly, easy to inspect diffs
+- Organized by plugin: `CLASS/`, `eisenstein/`
 
 **Comparison**: Python script (`compare_transfer_functions.py`)
 - Relative tolerance: 1e-6 (relaxed, suitable for physics validation)
@@ -400,18 +394,5 @@ git commit -m "Update transfer function references after [description]"
 
 Transfer function tests run automatically in GitHub Actions CI:
 - Executed on every push/PR to `master`
-- Separate from full IC generation tests (faster feedback)
-- References are part of the repository (no generation needed in CI)
+- Separate from IC generation tests 
 
-## Future Enhancements
-
-Potential improvements to the test suite:
-
-- [x] Test CLASS transfer function integration
-- [ ] Add glass initial conditions test
-- [ ] Add CAMB_file transfer function tests (requires pre-generated transfer files)
-
-## Questions or Issues?
-
-- Report test-related issues on GitHub: https://github.com/cosmo-sims/monofonIC/issues
-- Join the MUSIC user group: https://groups.google.com/g/cosmo_music
