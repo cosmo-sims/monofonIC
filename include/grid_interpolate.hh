@@ -200,9 +200,11 @@ struct grid_interpolate
     real_t dfz = sinc(0.5*M_PI*k[2]/gridref.kny_[2]);
     real_t del = std::pow(dfx*dfy*dfz,1+interpolation_order);
 
-    real_t shift = 0.5 * k[0] * gridref.get_dx()[0] + 0.5 * k[1] * gridref.get_dx()[1] + 0.5 * k[2] * gridref.get_dx()[2];
-
-    return std::exp(ccomplex_t(0.0, shift)) / del;
+    // real_t shift = 0.5 * k[0] * gridref.get_dx()[0] + 0.5 * k[1] * gridref.get_dx()[1] + 0.5 * k[2] * gridref.get_dx()[2];
+    // return std::exp(ccomplex_t(0.0, shift)) / del;
+    
+    // TODO: phase shift not needed for CIC to be consistent with SC grid ICs, check for TSC...
+    return 1.0 / del;
   }
 
 };

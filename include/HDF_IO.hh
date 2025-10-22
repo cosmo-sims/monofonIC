@@ -376,7 +376,7 @@ inline void HDFReadVectorSelect( const std::string Filename, const std::string O
 }
 
 template< typename T >
-inline void HDFReadVectorSlab( const std::string Filename, const std::string ObjName, unsigned nStart, unsigned nCount, std::vector<T> &Data )
+inline void HDFReadVectorSlab( const std::string Filename, const std::string ObjName, size_t nStart, size_t nCount, std::vector<T> &Data )
 {
   hsize_t 
       offset[2],
@@ -447,7 +447,7 @@ inline void HDFReadVectorSlab( const std::string Filename, const std::string Obj
 }
 
 template< typename T >
-inline void HDFReadDatasetSlab( const std::string Filename, const std::string ObjName, unsigned nStart, unsigned nCount, std::vector<T> &Data )
+inline void HDFReadDatasetSlab( const std::string Filename, const std::string ObjName, size_t nStart, size_t nCount, std::vector<T> &Data )
 {
   hsize_t 
       offset[2],
