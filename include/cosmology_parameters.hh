@@ -18,11 +18,17 @@
 
 #include <map>
 #include <string>
-#include <vector>
+#include <array>
 
 #include <physical_constants.hh>
 #include <config_file.hh>
 #include <general.hh>
+
+#include <math/interpolate.hh>
+
+#include <gsl/gsl_integration.h>
+#include <gsl/gsl_errno.h>
+#include <gsl/gsl_odeiv2.h>
 
 namespace cosmology
 {
@@ -131,6 +137,8 @@ namespace cosmology
                 //-------------------------------------------------------------------------------
                 // load predefined parameter set
                 //-------------------------------------------------------------------------------
+                pmap_["sigma_8"] = -1.0; // default to -1.0 unless set below
+
                 auto pset_name = cf.get_value<std::string>("cosmology","ParameterSet");
                 auto it = default_pmaps_.find( pset_name );
                 if( it == default_pmaps_.end() ){
@@ -145,7 +153,7 @@ namespace cosmology
                 }
                 // The order doesn't matter, so keep it in the order of the example.conf
                 std::array<std::string, 18> config_keys = {
-                    "Omega_m", "Omega_b", "Omega_L", "H0", "nspec", "n_s", "sigma_8", "A_s", "A_s", "Tcmb", "YHe",
+                    "Omega_m", "Omega_b", "Omega_L", "H0", "nspec", "n_s", "sigma_8", "A_s", "sigma_8", "Tcmb", "YHe",
                     "k_p", "m_nu1", "m_nu2", "m_nu3", "N_ur", "w_0", "w_a"
                 };
 
@@ -184,7 +192,7 @@ namespace cosmology
                         if (config_key == "sigma_8") {
                             it->second["A_s"] = -1.0;
                             music::ilog << "setting A_s=-1.0 as sigma_8 is set" << parameter_key << std::endl;
-                            // If sigma_8 and A_s is set, A_s wins
+                            // If sigma_8 and A_s is set, sigma_8 wins
                         }
                     }
                 }

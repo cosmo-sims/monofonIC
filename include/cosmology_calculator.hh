@@ -1,6 +1,7 @@
 // This file is part of monofonIC (MUSIC2)
 // A software package to generate ICs for cosmological simulations
 // Copyright (C) 2020 by Oliver Hahn
+//   Thomas Montandon (toma): 2nd and 3rd author growth functions
 // 
 // monofonIC is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -32,6 +33,60 @@
 
 namespace cosmology
 {
+//! structure for ODE parameters required to evaluate RHS of ODEs
+struct ODEParams {
+    double Omega_m;
+    double H0;
+    double w0;
+    double wa;
+};
+
+/*!
+ * @brief ODE system for growth factors to third order
+ *
+ * This function defines the system of ODEs to be solved to obtain the growth factors
+ * up to third order in perturbation theory for a single fluid in an expanding universe.
+ * The cosmological model is specified through the parameters Omega_m, w0, wa, and H0.
+ *
+ * @param t The independent variable (conformal time)
+ * @param y The dependent variable array containing [a, D, D', E, E', F_a, F_a', F_b, F_b', F_c]
+ * @param dydt The output array for the derivatives
+ * @param params Pointer to ODEParams structure containing cosmological parameters
+ * @return GSL_SUCCESS on successful evaluation
+ */
+inline int ode_system(double t, const double y[], double dydt[], void *params) {
+    ODEParams *p = static_cast<ODEParams *>(params);
+    double Omega_m = p->Omega_m;
+    double w0 = p->w0;
+    double wa = p->wa;
+    double H0 = p->H0;
+
+    double a = y[0];
+    double D = y[1];
+    double Dprime = y[2];
+    double E = y[3];
+    double Eprime = y[4];
+    double Fa = y[5];
+    double Faprime = y[6];
+    double Fb = y[7];
+    double Fbprime = y[8];
+    // double Fc = y[9];
+
+    double H_of_a = H0 * std::sqrt(Omega_m / (a * a * a) + (1 - Omega_m) * std::pow(a, -3 * (1 + w0 + wa)) * std::exp(-3 * wa * (1 - a)));
+
+    dydt[0] = a * a * H_of_a;
+    dydt[1] = Dprime;
+    dydt[2] = -a * H_of_a * Dprime + 3.0 / 2.0 * Omega_m * H0 * H0 * D / a;
+    dydt[3] = Eprime;
+    dydt[4] = -a * H_of_a * Eprime + 3.0 / 2.0 * Omega_m * H0 * H0 * (E - D * D) / a;
+    dydt[5] = Faprime;
+    dydt[6] = -a * H_of_a * Faprime + 3.0 / 2.0 * Omega_m * H0 * H0 * (Fa - 2.0 * D * D * D) / a;
+    dydt[7] = Fbprime;
+    dydt[8] = -a * H_of_a * Fbprime + 3.0 / 2.0 * Omega_m * H0 * H0 * (Fb + 2.0 * D * D * D - 2.0 * E * D) / a;
+    dydt[9] = D * Eprime - E * Dprime;
+
+    return GSL_SUCCESS;
+}
 
 /*!
  * @class cosmology::calculator
@@ -49,13 +104,16 @@ public:
 
     //! pointer to an instance of a transfer function plugin
     std::unique_ptr<TransferFunction_plugin> transfer_function_;
+double Dnow_, Dplus_start_, Dplus_target_, astart_, atarget_;
 
 private:
     static constexpr double REL_PRECISION = 1e-10;
-    interpolated_function_1d<true,true,false> D_of_a_, f_of_a_, a_of_D_;
-    double Dnow_, Dplus_start_, Dplus_target_, astart_, atarget_;
-
+    
     double m_n_s_, m_sqrtpnorm_, tnorm_;
+
+    //! interpolation functions of growth functions
+    interpolated_function_1d<true, true, false> D_of_a_, dotD_of_a_, f_of_a_, a_of_D_, E_of_a_, dotE_of_a_, Fa_of_a_, Fb_of_a_, dotFa_of_a_, dotFb_of_a_, Fc_of_a_, dotFc_of_a_; // toma
+
 
     //! wrapper for GSL adaptive integration routine, do not use if many integrations need to be done as it allocates and deallocates memory
     //! set to 61-point Gauss-Kronrod and large workspace, used for sigma_8 normalisation
@@ -82,71 +140,137 @@ private:
         return static_cast<real_t>(result);
     }
 
-    //! compute the linear theory growth factor D+ by solving the single fluid ODE, returns tables D(a), f(a)
-    /*!
-	 * @param tab_a reference to STL vector for values of a at which table entries exist
-     * @param tab_D reference to STL vector for values D(a) with a from tab_a
-     * @param tab_f reference to STL vector for values f(a)=dlog D / dlog a with a from tab_a
-     */
-    void compute_growth( std::vector<double>& tab_a, std::vector<double>& tab_D, std::vector<double>& tab_f )
+    /// @brief compute the perturbation theory growth factors up to third order D(a) E(a) F(a) by solving the single fluid ODE, returns tables
+    /// @param tab_a (out) table of scale factors
+    /// @param tab_D (out) table of linear growth factors D(a)
+    /// @param tab_f (out) table of linear growth rates f(a)
+    /// @param tab_E (out) table of second order growth factors E(a)
+    /// @param tab_dotE (out) table of second order growth rates E'(a)
+    /// @param tab_Fa (out) table of third order growth factors Fa(a)
+    /// @param tab_dotFa (out) table of third order growth rates Fa'(a)
+    /// @param tab_Fb (out) table of third order growth factors Fb(a)
+    /// @param tab_dotFb (out) table of third order growth rates Fb'(a)
+    /// @param tab_Fc (out) table of third order growth factors Fc(a)
+    /// @param tab_dotFc (out) table of third order growth rates Fc'(a)
+    void compute_growth(std::vector<double> &tab_a, std::vector<double> &tab_D, std::vector<double> &tab_dotD, std::vector<double> &tab_f,
+                        std::vector<double> &tab_E, std::vector<double> &tab_dotE,
+                        std::vector<double> &tab_Fa, std::vector<double> &tab_dotFa,
+                        std::vector<double> &tab_Fb, std::vector<double> &tab_dotFb,
+                        std::vector<double> &tab_Fc, std::vector<double> &tab_dotFc)
     {
-        using v_t = vec_t<3, double>;
+        // using v_t = vec_t<10, double>;
+        double Omega_m = cosmo_param_["Omega_m"];
+        double H0 = cosmo_param_["H0"];
+        double w0 = cosmo_param_["w_0"];
+        double wa = cosmo_param_["w_a"];
+        
 
         // set ICs, very deep in radiation domination
-        const double a0 = 1e-10;
-        const double D0 = a0;
-        const double Dprime0 = 2.0 * D0 * H_of_a(a0) / std::pow(phys_const::c_SI, 2);
+        const double a0 = 1e-6;
+        
+        // double H_a0 = H0 * std::sqrt(Omega_m / (a0 * a0 * a0) + (1 - Omega_m));
+        double H_a0 = H_of_a(a0);
         const double t0 = 1.0 / (a0 * H_of_a(a0));
 
-        v_t y0({a0, D0, Dprime0});
+        // first order growth
+        const double D0 = a0;
+        const double Dprime0 = a0 * a0 * H_a0;
+        
+        // second order growth
+        const double E0 = -3.0 / 7.0 * a0 * a0;
+        const double Eprime0 = -6.0 / 7.0 * std::pow(a0,3) * H_a0;
 
-        // set up integration
-        double dt = 1e-9;
-        double dtdid, dtnext;
-        const double amax = 2.0;
+        // third order growth
+        const double Fa0 = -1.0 / 3.0 * a0 * a0 * a0;
+        const double Faprime0 = -2.0 * std::pow(a0, 5.0 / 2.0);
 
-        v_t yy(y0);
+        const double Fb0 = 10. / 21 * a0 * a0 * a0;
+        const double Fbprime0 = 60. / 21 * std::pow(a0, 5.0 / 2.0);
+
+        const double Fc0 = -1.0 / 7.0 * a0 * a0 * a0;
+
+        double y[10] = {a0, D0, Dprime0, E0, Eprime0, Fa0, Faprime0, Fb0, Fbprime0, Fc0};
+
+        const gsl_odeiv2_step_type * T = gsl_odeiv2_step_rkf45;
+        gsl_odeiv2_step * s = gsl_odeiv2_step_alloc (T, 10);
+        gsl_odeiv2_control * c = gsl_odeiv2_control_y_new (1e-8, 0.0);
+        gsl_odeiv2_evolve * e = gsl_odeiv2_evolve_alloc (10);
+        // gsl_odeiv2_driver *d = gsl_odeiv2_driver_alloc_y_new(&sys, T, 1e-6, 0.0, 0.0);
+
+        ODEParams params = {Omega_m, H0, w0, wa};
+        gsl_odeiv2_system sys = {ode_system, nullptr, 10, &params};
+
+        double h = 1e-6;
         double t = t0;
-        const double eps = 1e-10;
+        double t1 = 0.1;
+        double amax = 1.1;
 
-        const double Omega_m( cosmo_param_["Omega_m"] ), H0( cosmo_param_["H0"] );
-
-        while (yy[0] < amax)
-        {
-            // RHS of ODEs
-            auto rhs = [&](double t, v_t y) -> v_t {
-                auto a = y[0];
-                auto D = y[1];
-                auto Dprime = y[2];
-                v_t dy;
-                // da/dtau = a^2 H(a)
-                dy[0] = a * a * H_of_a(a);
-                // d D/dtau
-                dy[1] = Dprime;
-                // d^2 D / dtau^2
-                dy[2] = -a * H_of_a(a) * Dprime + 3.0 / 2.0 * Omega_m * std::pow(H0, 2) * D / a;
-                return dy;
-            };
-
-            // scale by predicted value to get approx. constant fractional errors
-            v_t yyscale = yy.abs() + dt * rhs(t, yy).abs();
+        while (y[0] < amax) {
             
-            // call integrator
-            ode_integrate::rk_step_qs(dt, t, yy, yyscale, rhs, eps, dtdid, dtnext);
+            int status = gsl_odeiv2_evolve_apply (e, c, s, &sys, &t, t1, &h, y);
 
-            tab_a.push_back(yy[0]);
-            tab_D.push_back(yy[1]);
-            tab_f.push_back(yy[2]); // temporarily store D' in table
+            if (status != GSL_SUCCESS) {
+                std::cerr << "Error: " << gsl_strerror(status) << std::endl;
+                break;
+            }
 
-            dt = dtnext;
+            tab_a.push_back(y[0]);
+            tab_D.push_back(y[1]);
+            tab_f.push_back(y[2]); // temporarily store D' in table
+            tab_dotD.push_back(y[2]);
+            tab_E.push_back(y[3]);
+            tab_dotE.push_back(y[4]);
+            tab_Fa.push_back(y[5]);
+            tab_dotFa.push_back(y[6]);
+            tab_Fb.push_back(y[7]);
+            tab_dotFb.push_back(y[8]);
+            tab_Fc.push_back(y[9]);
+            tab_dotFc.push_back(y[9]); // temporarily store un-important random value
         }
 
-        // compute f, before we stored here D'
-        for (size_t i = 0; i < tab_a.size(); ++i)
+        gsl_odeiv2_evolve_free (e);
+        gsl_odeiv2_control_free (c);
+        gsl_odeiv2_step_free (s);
+        
+        if (CONFIG::MPI_task_rank == 0)
         {
-            tab_f[i] = tab_f[i] / (tab_a[i] * H_of_a(tab_a[i]) * tab_D[i]);
-            tab_D[i] = tab_D[i];
-            tab_a[i] = tab_a[i];
+            // output growth factors to file for debugging
+            std::ofstream output_file;
+            output_file.open("GrowthFactors.txt");
+            // compute f, before we stored here D'
+            output_file << "#"
+                        << "a"
+                        << " "
+                        << "D"
+                        << " "
+                        << "f"
+                        << " "
+                        << "E"
+                        << " "
+                        << "dotE"
+                        << " "
+                        << "Fa"
+                        << " "
+                        << "dotFa"
+                        << " "
+                        << "Fb"
+                        << " "
+                        << "dotFb"
+                        << " "
+                        << "Fc"
+                        << " "
+                        << "dotFc"
+                        << "\n";
+            for (size_t i = 0; i < tab_a.size(); ++i)
+            {
+
+                tab_dotFc[i] = (tab_D[i] * tab_dotE[i] - tab_E[i] * tab_f[i]); // toma
+                tab_f[i] = tab_f[i] / (tab_a[i] * H_of_a(tab_a[i]) * tab_D[i]);
+
+                // toma
+                output_file << tab_a[i] << " " << tab_D[i] << " " << tab_dotD[i] << " " << tab_E[i] << " " << tab_dotE[i] << " " << tab_Fa[i] << " " << tab_dotFa[i] << " " << tab_Fb[i] << " " << tab_dotFb[i] << " " << tab_Fc[i] << " " << tab_dotFc[i] << "\n";
+            }
+            output_file.close();
         }
     }
 
@@ -168,15 +292,28 @@ public:
             atarget_( 1.0/(1.0+cf.get_value_safe<double>("cosmology","ztarget",0.0)) )
     {
         // pre-compute growth factors and store for interpolation
-        std::vector<double> tab_a, tab_D, tab_f;
-        this->compute_growth(tab_a, tab_D, tab_f);
-        D_of_a_.set_data(tab_a,tab_D);
-        f_of_a_.set_data(tab_a,tab_f);
-        a_of_D_.set_data(tab_D,tab_a);
+        std::vector<double> tab_a, tab_D, tab_dotD, tab_f, tab_E, tab_dotE, tab_Fa, tab_dotFa, tab_Fb, tab_dotFb, tab_Fc, tab_dotFc;   // toma
+        this->compute_growth(tab_a, tab_D, tab_dotD, tab_f, tab_E, tab_dotE, tab_Fa, tab_dotFa, tab_Fb, tab_dotFb, tab_Fc, tab_dotFc); // toma
+        D_of_a_.set_data(tab_a, tab_D);
+        dotD_of_a_.set_data(tab_a, tab_dotD);
+        f_of_a_.set_data(tab_a, tab_f);
+        a_of_D_.set_data(tab_D, tab_a);
+
+        // toma
+        E_of_a_.set_data(tab_a, tab_E);
+        dotE_of_a_.set_data(tab_a, tab_dotE);
+
+        Fa_of_a_.set_data(tab_a, tab_Fa);
+        Fb_of_a_.set_data(tab_a, tab_Fb);
+        Fc_of_a_.set_data(tab_a, tab_Fc);
+        dotFa_of_a_.set_data(tab_a, tab_dotFa);
+        dotFb_of_a_.set_data(tab_a, tab_dotFb);
+        dotFc_of_a_.set_data(tab_a, tab_dotFc);
+
         Dnow_ = D_of_a_(1.0);
 
-        Dplus_start_  = D_of_a_( astart_ ) / Dnow_;
-        Dplus_target_ = D_of_a_( atarget_ ) / Dnow_;
+        Dplus_start_ = D_of_a_(astart_) / Dnow_;
+        Dplus_target_ = D_of_a_(atarget_) / Dnow_;
 
         music::ilog << "Linear growth factors: D+_target = " << Dplus_target_ << ", D+_start = " << Dplus_start_ << std::endl;
 
@@ -346,20 +483,89 @@ public:
 
     //! Computes the linear theory growth rate f
     /*! Function computes (by interpolating on precalculated table)
-     *   f = dlog D+ / dlog a
-     */
+        *   f = dlog D+ / dlog a
+        */
     real_t get_f(real_t a) const noexcept
     {
         return f_of_a_(a);
     }
 
+    real_t get_dotD(real_t a) const noexcept
+    {
+        return dotD_of_a_(a);
+    }
+
     //! Compute the factor relating particle displacement and velocity
     /*! Function computes
-     *  vfac = a * (H(a)/h) * dlogD+ / dlog a 
-     */
+        *  vfac = a * (H(a)/h) * dlogD+ / dlog a
+        */
     real_t get_vfact(real_t a) const noexcept
     {
+
+        music::ilog << a << " --> " << a * H_of_a(a) / cosmo_param_["h"] << std::endl;
         return f_of_a_(a) * a * H_of_a(a) / cosmo_param_["h"];
+    }
+
+    // toma
+    //! Computes the second-order growth factor E,
+    //! see definition in 2205.11347 (eq. 28) (or 1602.05933 eq. 2.21)
+    real_t get_2growth_factor(real_t a) const noexcept
+    {
+        return E_of_a_(a) / Dnow_ / Dnow_;
+    }
+
+    // toma
+    //! Computes the time derivative w.r.t. conformal time of the
+    //! second-order growth factor E
+    //! see definition in 2205.11347 (eq. 28) (or 1602.05933 eq. 2.21)
+    real_t get_dotE(real_t a) const noexcept
+    {
+        return dotE_of_a_(a) / Dnow_ / Dnow_ / cosmo_param_["h"];;
+    }
+
+    //! Computes the third-order growth factor Fa,
+    //! see definition in 2205.11347
+    real_t get_3growthA_factor(real_t a) const noexcept
+    {
+        return Fa_of_a_(a) / Dnow_ / Dnow_ / Dnow_;
+    }
+
+    //! Computes the third-order growth factor Fb,
+    //! see definition in 2205.11347
+    real_t get_3growthB_factor(real_t a) const noexcept
+    {
+        return Fb_of_a_(a) / Dnow_ / Dnow_ / Dnow_;
+    }
+
+    //! Computes the third-order growth factor Fc,
+    //! see definition in 2205.11347
+    real_t get_3growthC_factor(real_t a) const noexcept
+    {
+        return Fc_of_a_(a) / Dnow_ / Dnow_ / Dnow_;
+    }
+
+    //! Computes the conformal time derivative of the
+    //! third-order growth factor Fa,
+    //! see definition in 2205.11347
+    real_t get_dotFa(real_t a) const noexcept
+    {
+        return dotFa_of_a_(a) / Dnow_ / Dnow_ / Dnow_ / cosmo_param_["h"];;
+    }
+
+    //! computes the conformal time derivative of the
+    //! third-order growth factor Fb,
+    //! see definition in 2205.11347
+    real_t get_dotFb(real_t a) const noexcept
+    {
+        return dotFb_of_a_(a) / Dnow_ / Dnow_ / Dnow_ / cosmo_param_["h"];;
+    }
+
+    //! computes the conformal time derivative of the
+    //! third-order growth factor Fc,
+    //! see definition in 2205.11347
+    real_t get_dotFc(real_t a) const noexcept
+    {
+        return dotFc_of_a_(a) / Dnow_ / Dnow_ / Dnow_ / cosmo_param_["h"];;
     }
 
     //! Integrand for the sigma_8 normalization of the power spectrum
