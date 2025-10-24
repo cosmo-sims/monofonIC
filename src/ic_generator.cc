@@ -435,7 +435,7 @@ int run( config_file& the_config )
 
     phi.FourierTransformForward(false);
 
-        if (fnl != 0 || gnl != 0) {
+    if (fnl != 0 || gnl != 0) {
 
         phi.assign_function_of_grids_kdep([&](auto k, auto wn) {
             real_t kmod = k.norm();
@@ -459,17 +459,15 @@ int run( config_file& the_config )
  
         delta_power.FourierTransformBackward();
         phi.FourierTransformBackward();
+        real_t var_phi = delta_power.mean();  // = <phi^2>
         if (fnl != 0)
         {
             music::ilog << "\n>>> Computing  fnl term.... <<<\n" << std::endl;
 
             phi.assign_function_of_grids_r([&](auto delta1, auto delta_power ){
-                     return norm*(delta1 -fnl*delta_power*3.0/5.0) ;}, phi, delta_power);
-                    // return norm*(delta1 - fnl*delta_power) ;}, phi, delta_power);
+                     return norm*(delta1 - fnl*(delta_power - var_phi)*3.0/5.0) ;}, phi, delta_power);
                     // the -3/5 factor is to match the usual fnl  in terms of phi
                     // 3/5 fnl_zeta = fnl_phi
-                    // no need to sustract the mean since latter 
-                    //is assured that the mean of delta is zero
         }
         else{
 
@@ -481,11 +479,11 @@ int run( config_file& the_config )
             phi.FourierTransformBackward();
 
             phi.assign_function_of_grids_r([&](auto delta1, auto delta_power ){
-                     return norm*(delta1 - gnl*delta_power*9.0/25.0) ;}, phi, delta_power);  
+                     return norm*(delta1 - gnl*(delta_power - 3*var_phi*delta1)*9.0/25.0) ;}, phi, delta_power);  
                       // the -9/25 factor is to match the usual gnl  in terms of phi
                       // 9/25 gnl_zeta = gnl_phi  
         }
-
+        delta_power.reset();
         phi.FourierTransformForward();
 
         phi.assign_function_of_grids_kdep([&](auto k, auto delta) {
