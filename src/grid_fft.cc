@@ -250,14 +250,14 @@ void Grid_FFT<data_t, bdistributed>::FourierTransformBackward(bool do_transform)
         //.............................
         if (do_transform)
         {
-            music::dlog.Print("[FFT] Calling Grid_FFT::to_rspace (%dx%dx%d)\n", sizes_[0], sizes_[1], sizes_[2]);
+            music::dlog.Print("[FFT] Calling Grid_FFT::to_rspace (%zux%zux%zu)\n", sizes_[0], sizes_[1], sizes_[2]);
             double wtime = get_wtime();
 
             FFTW_API(execute)(iplan_);
             this->ApplyNorm();
 
             wtime = get_wtime() - wtime;
-            music::dlog.Print("[FFT] Completed Grid_FFT::to_rspace (%dx%dx%d), took %f s\n", sizes_[0], sizes_[1], sizes_[2], wtime);
+            music::dlog.Print("[FFT] Completed Grid_FFT::to_rspace (%zux%zux%zu), took %f s\n", sizes_[0], sizes_[1], sizes_[2], wtime);
         }
         sizes_[0] = local_0_size_;
         sizes_[1] = n_[1];
