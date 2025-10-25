@@ -7,6 +7,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Options
 option(ENABLE_TESTS "compile test executables" OFF)
 
+# Generate CLASS version information
+set(CLASS_SOURCE_DIR ${PROJECT_SOURCE_DIR})
+set(CLASS_BINARY_DIR ${PROJECT_BINARY_DIR})
+ADD_CUSTOM_COMMAND(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/class_version.cc
+           ${CMAKE_CURRENT_BINARY_DIR}/_class_version.cc
+    COMMAND ${CMAKE_COMMAND}
+            -DCLASS_SOURCE_DIR=${CLASS_SOURCE_DIR}
+            -DCLASS_BINARY_DIR=${CLASS_BINARY_DIR}
+            -P ${CLASS_SOURCE_DIR}/class_version.cmake)
+
 # OpenMP
 find_package(OpenMP)
 
@@ -17,6 +28,8 @@ file( GLOB TOOLS_SRC
 file( GLOB SOURCE_SRC
   ${PROJECT_SOURCE_DIR}/source/*.c
 )
+# Add the auto-generated CLASS version file
+list(APPEND SOURCE_SRC "${CMAKE_CURRENT_BINARY_DIR}/class_version.cc")
 
 set(CPP_SRC 
     ${PROJECT_SOURCE_DIR}/tools/arrays.c
@@ -57,6 +70,7 @@ set(EXTERNAL_INCLUDE
 
 SET_SOURCE_FILES_PROPERTIES(${CPP_SRC} PROPERTIES LANGUAGE CXX )
 SET_SOURCE_FILES_PROPERTIES(${EXTERNAL_SRC} PROPERTIES LANGUAGE CXX )
+SET_SOURCE_FILES_PROPERTIES(${CMAKE_CURRENT_BINARY_DIR}/class_version.cc PROPERTIES LANGUAGE CXX )
 
 ## Main library
 
@@ -72,7 +86,7 @@ endif()
 add_library(libclass STATIC ${TOOLS_SRC} ${SOURCE_SRC} ${EXTERNAL_SRC} )
 add_library(class::libclass ALIAS libclass)
 
-target_compile_options(libclass PRIVATE -Wno-write-strings -fpermissive -O3 -g )
+target_compile_options(libclass PRIVATE -w -Wno-write-strings -fpermissive -O3 -g )
 set_property(TARGET libclass PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 target_compile_definitions(libclass PUBLIC "__CLASSDIR__=\"${CMAKE_CURRENT_SOURCE_DIR}\"")

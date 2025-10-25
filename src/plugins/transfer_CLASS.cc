@@ -37,6 +37,12 @@
 
 #include "transfer_CLASS.hh"
 
+// External declarations for CLASS version information
+extern "C" {
+  extern const char *CLASS_GIT_REV;
+  extern const char *CLASS_GIT_TAG;
+  extern const char *CLASS_GIT_BRANCH;
+}
 
 class transfer_CLASS_plugin : public TransferFunction_plugin
 {
@@ -484,6 +490,10 @@ public:
     f_c_ = cosmo_params_["Omega_c"] / (cosmo_params_["Omega_b"] + cosmo_params_["Omega_c"]);
     h_   = cosmo_params_["h"];
     
+    music::ilog << "CLASS: Version: git rev.: " << CLASS_GIT_REV
+                << ", tag: " << CLASS_GIT_TAG
+                << ", branch: " << CLASS_GIT_BRANCH << std::endl;
+
     if (cosmo_params_["A_s"] > 0.0) {
       music::ilog << "CLASS: Using A_s=" << colors::CONFIG_VALUE << cosmo_params_["A_s"] << colors::RESET << " to normalise the transfer function." << std::endl;
     }else{
