@@ -485,13 +485,13 @@ public:
     h_   = cosmo_params_["h"];
     
     if (cosmo_params_["A_s"] > 0.0) {
-      music::ilog << "CLASS: Using A_s=" << cosmo_params_["A_s"] << " to normalise the transfer function." << std::endl;
+      music::ilog << "CLASS: Using A_s=" << colors::CONFIG_VALUE << cosmo_params_["A_s"] << colors::RESET << " to normalise the transfer function." << std::endl;
     }else{
       double sigma8 = cosmo_params_["sigma_8"];
       if( sigma8 < 0 ){
         throw std::runtime_error("Need to specify either A_s or sigma_8 for CLASS plugin...");
       }
-      music::ilog << "CLASS: Using sigma8_ =" << sigma8<< " to normalise the transfer function." << std::endl;
+      music::ilog << "CLASS: Using sigma8_ =" << colors::CONFIG_VALUE << sigma8 << colors::RESET << " to normalise the transfer function." << std::endl;
     }
 
     // determine highest k we will need for the resolution selected
@@ -534,11 +534,15 @@ public:
     kmin_ = k[0];
     kmax_ = k.back();
 
-    music::ilog << "CLASS table contains k = " << this->get_kmin() << " to " << this->get_kmax() << " h Mpc-1." << std::endl;
+    music::ilog << "CLASS table contains k = " << colors::CONFIG_VALUE << this->get_kmin() << colors::RESET << " to " << colors::CONFIG_VALUE << this->get_kmax() << colors::RESET << " h Mpc-1." << std::endl;
 
     tf_distinct_ = true;
     tf_withvel_ = true;
     tf_withtotal0_ = true;
+
+    // Free CLASS structures immediately after extracting transfer function data
+    // to avoid keeping ~116 MB in memory throughout the entire run
+    this->free_class();
   }
 
   ~transfer_CLASS_plugin()

@@ -322,7 +322,7 @@ public:
         Dplus_start_ = D_of_a_(astart_) / Dnow_;
         Dplus_target_ = D_of_a_(atarget_) / Dnow_;
 
-        music::ilog << "Linear growth factors: D+_target = " << Dplus_target_ << ", D+_start = " << Dplus_start_ << std::endl;
+        music::ilog << "Linear growth factors: D+_target = " << colors::CONFIG_VALUE << Dplus_target_ << colors::RESET << ", D+_start = " << colors::CONFIG_VALUE << Dplus_start_ << colors::RESET << std::endl;
 
         // set up transfer functions and compute normalisation
         transfer_function_ = std::move(select_TransferFunction_plugin(cf, cosmo_param_));
@@ -332,16 +332,16 @@ public:
         }else{
             cosmo_param_.set("pnorm", 1.0/Dplus_target_/Dplus_target_);
             auto sigma8 = this->compute_sigma8();
-            music::ilog << "Measured sigma_8 for given PS normalisation is " <<  sigma8 << std::endl;
+            music::ilog << "Measured sigma_8 for given PS normalisation is " << colors::CONFIG_VALUE << sigma8 << colors::RESET << std::endl;
         }
         cosmo_param_.set("sqrtpnorm", std::sqrt(cosmo_param_["pnorm"]));
 
         music::ilog << std::setw(32) << std::left << "TF supports distinct CDM+baryons"
-                    << " : " << (transfer_function_->tf_is_distinct() ? "yes" : "no") << std::endl;
+                    << " : " << colors::CONFIG_VALUE << (transfer_function_->tf_is_distinct() ? "yes" : "no") << colors::RESET << std::endl;
         music::ilog << std::setw(32) << std::left << "TF minimum wave number"
-                    << " : " << transfer_function_->get_kmin() << " h/Mpc" << std::endl;
+                    << " : " << colors::CONFIG_VALUE << transfer_function_->get_kmin() << colors::RESET << " h/Mpc" << std::endl;
         music::ilog << std::setw(32) << std::left << "TF maximum wave number"
-                    << " : " << transfer_function_->get_kmax() << " h/Mpc" << std::endl;
+                    << " : " << colors::CONFIG_VALUE << transfer_function_->get_kmax() << colors::RESET << " h/Mpc" << std::endl;
         if( std::sqrt(3.0)* 2.0*M_PI / cf.get_value<double>("setup","BoxLength") * cf.get_value<double>("setup","GridRes")/2  >= transfer_function_->get_kmax() ){
             music::elog << "Simulation nyquist mode kny = " << std::sqrt(3.0)* 2.0*M_PI / cf.get_value<double>("setup","BoxLength") * cf.get_value<double>("setup","GridRes")/2 << " h/Mpc is beyond valid range of transfer function!" << std::endl;
         }

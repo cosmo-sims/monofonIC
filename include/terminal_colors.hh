@@ -61,7 +61,7 @@ constexpr const char* RESET          = "\033[0m";         // Reset to default
 // Decorative symbols (UTF-8)
 // ============================================================================
 
-constexpr const char* SYM_CHECK      = "✓";               // Task executing/completed
+constexpr const char* SYM_CHECK      = "▸";               // Task executing/completed
 constexpr const char* SYM_SKIP       = "○";               // Task skipped
 constexpr const char* SYM_DIAMOND    = "✦";               // Section headers
 constexpr const char* SYM_ATOM       = "⚛";               // Physics/species

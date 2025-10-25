@@ -184,8 +184,7 @@ if(ENABLE_PANPHASIA)
     endif()
 endif()
 
-# Set C++14 standard
-set_target_properties(test_transfer_functions PROPERTIES CXX_STANDARD 14)
+# C++ standard and compile options are inherited from parent CMakeLists.txt
 
 # Include directories
 target_include_directories(test_transfer_functions PRIVATE

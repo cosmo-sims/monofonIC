@@ -23,9 +23,18 @@
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <sstream>
+#include <regex>
+#include <type_traits>
 #include <terminal_colors.hh>
 
 namespace music {
+
+// Helper function to strip ANSI color codes from strings
+inline std::string strip_ansi_codes(const std::string& str) {
+  static const std::regex ansi_regex("\033\\[[0-9;]*m");
+  return std::regex_replace(str, ansi_regex, "");
+}
 
 enum log_level : int {
   off     = 0,
@@ -58,7 +67,17 @@ public:
   template <typename T> logger &operator<<(const T &item) {
     std::cout << item;
     if (output_file_.is_open()) {
-      output_file_ << item;
+      // Only strip ANSI codes from string types, pass everything else through
+      // to preserve stream formatting (e.g., std::setw)
+      using bare_type = typename std::decay<T>::type;
+      if constexpr (std::is_same_v<bare_type, std::string> ||
+                    std::is_same_v<bare_type, const char*> ||
+                    std::is_same_v<bare_type, char*>) {
+        std::string str_item = item;
+        output_file_ << strip_ansi_codes(str_item);
+      } else {
+        output_file_ << item;
+      }
     }
     return *this;
   }

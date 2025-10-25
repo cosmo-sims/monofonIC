@@ -149,7 +149,7 @@ namespace cosmology
                     }
                     throw std::runtime_error("Invalid value for cosmology/ParameterSet");
                 }else{
-                    music::ilog << "Loading cosmological parameter set \'" << it->first << "\'..." << std::endl;
+                    music::ilog << "Loading cosmological parameter set \'" << colors::CONFIG_VALUE << it->first << colors::RESET << "\'..." << std::endl;
                 }
                 // The order doesn't matter, so keep it in the order of the example.conf
                 std::array<std::string, 18> config_keys = {
