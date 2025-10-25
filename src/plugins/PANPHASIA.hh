@@ -148,10 +148,10 @@ namespace PANPHASIA1
 
       clear_panphasia_thread_states();
 
-      music::ilog.Print("PANPHASIA: using grid size %lld (level=%d)", ngrid_panphasia_, lextra_);
+      music::ilog.Print("PANPHASIA: using grid size %d (level=%d)", ngrid_panphasia_, lextra_);
       if (ngridminsize_panphasia < 512)
         music::ilog.Print("PANPHASIA WARNING: PanphasiaMinRootResolution = %d below minimum recommended of 512", ngridminsize_panphasia);
-      music::ilog.Print("PANPHASIA: running with %d threads", num_threads_, ngrid_panphasia_);
+      music::ilog.Print("PANPHASIA: running with %d threads", num_threads_);
 
       coordinate_system_shift_[0] = -pcf_->get_value_safe<int>("setup", "shift_x", 0);
       coordinate_system_shift_[1] = -pcf_->get_value_safe<int>("setup", "shift_y", 0);

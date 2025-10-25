@@ -105,7 +105,7 @@ private:
       }
 
       ifs.close();
-      music::ilog.Print("Read CAMB transfer function table with %d rows", nlines);
+      music::ilog.Print("Read CAMB transfer function table with %zu rows", nlines);
 
       // if (m_linbaryoninterp)
       //   music::ilog.Print("Using log-lin interpolation for baryons\n    (TF is not positive definite)");

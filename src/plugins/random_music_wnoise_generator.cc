@@ -186,7 +186,7 @@ music_wnoise_generator<T>::music_wnoise_generator(unsigned res, std::string rand
   std::vector<float> in_float;
   std::vector<double> in_double;
 
-  music::ilog.Print("Random number file \'%s\'\n   contains %ld numbers. Reading...", randfname.c_str(), nx * ny * nz);
+  music::ilog.Print("Random number file \'%s\'\n   contains %u numbers. Reading...", randfname.c_str(), nx * ny * nz);
 
   long double sum = 0.0, sum2 = 0.0;
   size_t count = 0;
