@@ -73,7 +73,7 @@ std::unique_ptr<RNG_plugin> select_RNG_plugin(config_file &cf)
     }
     else
     {
-        music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+        music::ilog << music::HRULE << std::endl;
         music::ilog << std::setw(32) << std::left << "Random number generator plugin" << " : " << rngname << std::endl;
     }
 

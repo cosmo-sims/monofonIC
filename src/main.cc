@@ -101,13 +101,13 @@ int main( int argc, char** argv )
 #endif
 
     // Ascii ART logo. generated via http://patorjk.com/software/taag/#p=display&f=Nancyj&t=monofonIC
-    music::ilog << "\n"
+    music::ilog << "\n" << colors::LOGO
                 << " The unigrid version of MUSIC-2         .8888b                   dP  a88888b. \n"
                 << "                                        88   \"                   88 d8\'   `88 \n"
                 << "  88d8b.d8b. .d8888b. 88d888b. .d8888b. 88aaa  .d8888b. 88d888b. 88 88        \n"
                 << "  88\'`88\'`88 88\'  `88 88\'  `88 88\'  `88 88     88\'  `88 88\'  `88 88 88        \n"
                 << "  88  88  88 88.  .88 88    88 88.  .88 88     88.  .88 88    88 88 Y8.   .88 \n"
-                << "  dP  dP  dP `88888P\' dP    dP `88888P\' dP     `88888P\' dP    dP dP  Y88888P\' \n" << std::endl;
+                << "  dP  dP  dP `88888P\' dP    dP `88888P\' dP     `88888P\' dP    dP dP  Y88888P\' \n" << colors::RESET << std::endl;
 
     // git and versioning info:
     music::ilog << "Version: git rev.: " << GIT_REV << ", tag: " << GIT_TAG << ", branch: " << GIT_BRANCH << std::endl;
@@ -122,12 +122,12 @@ int main( int argc, char** argv )
 #endif
 
     
-    music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+    music::ilog << music::HRULE << std::endl;
     music::ilog << "Compile time options : " << std::endl;
-    music::ilog << "                       Precision : " << CMAKE_PRECISION_STR << std::endl;
-    music::ilog << "                    Convolutions : " << CMAKE_CONVOLVER_STR << std::endl;
-    music::ilog << "                             PLT : " << CMAKE_PLT_STR << std::endl;
-    music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+    music::ilog << "                       Precision : " << colors::CONFIG_VALUE << CMAKE_PRECISION_STR << colors::RESET << std::endl;
+    music::ilog << "                    Convolutions : " << colors::CONFIG_VALUE << CMAKE_CONVOLVER_STR << colors::RESET << std::endl;
+    music::ilog << "                             PLT : " << colors::CONFIG_VALUE << CMAKE_PLT_STR << colors::RESET << std::endl;
+    music::ilog << music::HRULE << std::endl;
 
 
     //------------------------------------------------------------------------------
@@ -153,7 +153,7 @@ int main( int argc, char** argv )
     music::ilog << "                         argv[1] : " << argv[1] << std::endl;
     music::ilog << "                 config_basename : " << the_config.get_path_relative_to_config("") << std::endl;
     music::ilog << "                        log file : " << log_filename << std::endl;
-    music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+    music::ilog << music::HRULE << std::endl;
 
     //------------------------------------------------------------------------------
     // Set up FFTW
@@ -245,6 +245,8 @@ int main( int argc, char** argv )
 
     ///////////////////////////////////////////////////////////////////////
     // Initialise plug-ins
+    music::ilog << music::HRULE << std::endl;
+    music::ilog << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Initializing plugins" << colors::RESET << std::endl;
     try
     {
         ic_generator::initialise( the_config );
@@ -267,10 +269,12 @@ int main( int argc, char** argv )
 
     ///////////////////////////////////////////////////////////////////////
     // call the destructor of plugins before tearing down MPI
+    music::ilog << music::HRULE << std::endl;
+    music::ilog << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Finalizing" << colors::RESET << std::endl;
     ic_generator::reset();
     ///////////////////////////////////////////////////////////////////////
 
-    music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+    music::ilog << music::HRULE << std::endl;
     size_t peak_mem = memory::getPeakRSS();
 #if defined(USE_MPI)
     size_t peak_mem_max{0};
@@ -288,8 +292,8 @@ int main( int argc, char** argv )
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
 #endif
-        
-    music::ilog << "Done. Have a nice day!\n" << std::endl;
+
+    music::ilog << colors::SUCCESS << "Done. Have a nice day!" << colors::RESET << "\n" << std::endl;
 
     return 0;
 }

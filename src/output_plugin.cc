@@ -70,7 +70,7 @@ std::unique_ptr<output_plugin> select_output_plugin( config_file& cf, std::uniqu
 		throw std::runtime_error("Unknown output plug-in");
 		
 	}else{
-		music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+		music::ilog << music::HRULE << std::endl;
 		music::ilog << std::setw(32) << std::left << "Output plugin" << " : " << formatname << std::endl;
 	}
 	

@@ -138,23 +138,23 @@ int run( config_file& the_config )
         : ((lattice_str=="masked")? particle::lattice_masked
         : particle::lattice_sc)))));
 
-    music::ilog << "Using " << lattice_str << " lattice for particle load." << std::endl;
+    music::ilog << "Using " << colors::CONFIG_VALUE << lattice_str << colors::RESET << " lattice for particle load." << std::endl;
 
     //--------------------------------------------------------------------------------------------------------
     //! apply fixing of the complex mode amplitude following Angulo & Pontzen (2016) [https://arxiv.org/abs/1603.05253]
     const bool bDoFixing    = the_config.get_value_safe<bool>("setup", "DoFixing", false);
-    music::ilog << "Fixing of complex mode amplitudes is " << (bDoFixing?"enabled":"disabled") << std::endl;
+    music::ilog << "Fixing of complex mode amplitudes is " << colors::CONFIG_VALUE << (bDoFixing?"enabled":"disabled") << colors::RESET << std::endl;
 
     const bool bDoInversion = the_config.get_value_safe<bool>("setup", "DoInversion", false);
-    music::ilog << "Inversion of the phase field is " << (bDoInversion?"enabled":"disabled") << std::endl;
+    music::ilog << "Inversion of the phase field is " << colors::CONFIG_VALUE << (bDoInversion?"enabled":"disabled") << colors::RESET << std::endl;
 
     //--------------------------------------------------------------------------------------------------------
     //! do baryon ICs?
     const bool bDoBaryons = the_config.get_value_safe<bool>("setup", "DoBaryons", false );
-    music::ilog << "Baryon ICs are " << (bDoBaryons?"enabled":"disabled") << std::endl;
+    music::ilog << "Baryon ICs are " << colors::CONFIG_VALUE << (bDoBaryons?"enabled":"disabled") << colors::RESET << std::endl;
     //! enable also back-scaled decaying relative velocity mode? only first order!
     const bool bDoLinearBCcorr = the_config.get_value_safe<bool>("setup", "DoBaryonVrel", false);
-    music::ilog << "Baryon linear relative velocity mode is " << (bDoLinearBCcorr?"enabled":"disabled") << std::endl;
+    music::ilog << "Baryon linear relative velocity mode is " << colors::CONFIG_VALUE << (bDoLinearBCcorr?"enabled":"disabled") << colors::RESET << std::endl;
     // compute mass fractions 
     std::map< cosmo_species, double > Omega;
     if( bDoBaryons ){
@@ -212,6 +212,26 @@ int run( config_file& the_config )
     the_cosmo_calc->write_powerspectrum(astart, the_config.get_path_relative_to_config("input_powerspec.txt"));
     the_cosmo_calc->write_transfer(the_config.get_path_relative_to_config("input_transfer.txt"));
 
+    // Print primordial non-Gaussianity parameters if set
+    if (fnl != 0.0 || gnl != 0.0) {
+        music::ilog << "Primordial non-Gaussianity (local-type):" << std::endl;
+        if (fnl != 0.0) {
+            music::ilog << " f_NL     = " << colors::CONFIG_VALUE << std::setw(16) << fnl << colors::RESET << std::endl;
+            if (nf != 0.0) {
+                music::ilog << " n_f      = " << colors::CONFIG_VALUE << std::setw(16) << nf << colors::RESET;
+                music::ilog << "k_0      = " << colors::CONFIG_VALUE << std::setw(16) << k0 << colors::RESET << " h/Mpc" << std::endl;
+            }
+        }
+        if (gnl != 0.0) {
+            music::ilog << " g_NL     = " << colors::CONFIG_VALUE << std::setw(16) << gnl << colors::RESET << std::endl;
+            if (nf != 0.0) {
+                music::ilog << " n_f      = " << colors::CONFIG_VALUE << std::setw(16) << nf << colors::RESET;
+                music::ilog << "k_0      = " << colors::CONFIG_VALUE << std::setw(16) << k0 << colors::RESET << " h/Mpc" << std::endl;
+            }
+        }
+        music::ilog << " norm     = " << colors::CONFIG_VALUE << std::setw(16) << norm << colors::RESET << std::endl;
+    }
+
     // the_cosmo_calc->compute_sigma_bc();
     // abort();
 
@@ -254,8 +274,8 @@ int run( config_file& the_config )
     Grid_FFT<real_t> wnoise({ngrid, ngrid, ngrid}, {boxlen, boxlen, boxlen});
 
     //... Fill the wnoise grid with a Gaussian white noise field, we do this first since the RNG might need extra memory
-    music::ilog << "-------------------------------------------------------------------------------" << std::endl;
-    music::ilog << "Generating white noise field...." << std::endl;
+    music::ilog << music::HRULE << std::endl;
+    music::ilog << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Generating white noise field" << colors::RESET << std::endl;
 
     the_random_number_generator->Fill_Grid(wnoise);
     
@@ -397,11 +417,11 @@ int run( config_file& the_config )
     //======================================================================
     // phi = - delta / k^2
 
-    music::ilog << "-------------------------------------------------------------------------------" << std::endl;
-    music::ilog << "\n>>> Generating LPT fields.... <<<\n" << std::endl;
+    music::ilog << music::HRULE << std::endl;
+    music::ilog << colors::BOLD << colors::HEADER << "\n" << colors::SYM_DIAMOND << " Generating LPT fields\n" << colors::RESET << std::endl;
 
     double wtime = get_wtime();
-    music::ilog << std::setw(79) << std::setfill('.') << std::left << ">> Computing phi(1) term" << std::endl;
+    music::ilog << colors::SYM_CHECK << " " << colors::TASK_NAME << "Computing phi(1) term" << colors::RESET << std::setw(56) << std::setfill('.') << std::left << "" << std::endl;
 
     phi.FourierTransformForward(false);
 
@@ -432,7 +452,8 @@ int run( config_file& the_config )
         real_t var_phi = delta_power.mean();  // = <phi^2>
         if (fnl != 0)
         {
-            music::ilog << "\n>>> Computing  fnl term.... <<<\n" << std::endl;
+            music::ilog << "\n" << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Applying PNG modifications (local-type)" << colors::RESET << std::endl;
+            music::ilog << colors::SYM_CHECK << " " << colors::TASK_NAME << "Computing f_NL term" << colors::RESET << std::endl;
 
             phi.assign_function_of_grids_r([&](auto delta1, auto delta_power ){
                      return norm*(delta1 - fnl*(delta_power - var_phi)*3.0/5.0) ;}, phi, delta_power);
@@ -441,7 +462,8 @@ int run( config_file& the_config )
         }
         else{
 
-            music::ilog << "\n>>> Computing  gnl term.... <<<\n" << std::endl;
+            music::ilog << "\n" << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Applying PNG modifications (local-type)" << colors::RESET << std::endl;
+            music::ilog << colors::SYM_CHECK << " " << colors::TASK_NAME << "Computing g_NL term" << colors::RESET << std::endl;
             
             Conv.multiply_field(delta_power, phi , op::assign_to(delta_power)); // delta3 = delta^3
 
@@ -480,9 +502,9 @@ int run( config_file& the_config )
     {
         phi2.allocate();
         phi2.FourierTransformForward(false);
-        
+
         wtime = get_wtime();
-        music::ilog << std::setw(79) << std::setfill('.') << std::left << ">> Computing phi(2) term" << std::endl;
+        music::ilog << colors::SYM_CHECK << " " << colors::TASK_NAME << "Computing phi(2) term" << colors::RESET << std::setw(56) << std::setfill('.') << std::left << "" << std::endl;
         Conv.convolve_SumOfHessians(phi, {0, 0}, phi, {1, 1}, {2, 2}, op::assign_to(phi2));
         Conv.convolve_Hessians(phi, {1, 1}, phi, {2, 2}, op::add_to(phi2));
         Conv.convolve_Hessians(phi, {0, 1}, phi, {0, 1}, op::subtract_from(phi2));
@@ -517,12 +539,11 @@ int run( config_file& the_config )
     {
         
 
-        
+
         //... phi3 = phi3a - 10/7 phi3b
         //... 3a term ...
-        music::ilog << std::setw(79) << std::setfill('.') << std::left << ">> Computing phi(3a) term" << std::endl;
-        
         wtime = get_wtime();
+        music::ilog << colors::SYM_CHECK << " " << colors::TASK_NAME << "Computing phi(3a) term" << colors::RESET << std::setw(55) << std::setfill('.') << std::left << "" << std::endl;
         phi3a.allocate();
         phi3a.FourierTransformForward(false);
         Conv.convolve_Hessians(phi, {0, 0}, phi, {1, 1}, phi, {2, 2}, op::assign_to(phi3a));
@@ -534,9 +555,8 @@ int run( config_file& the_config )
         music::ilog << std::setw(70) << std::setfill(' ') << std::right << "took : " << std::setw(8) << get_wtime() - wtime << "s" << std::endl;
 
         //... 3b term ...
-        music::ilog << std::setw(71) << std::setfill('.') << std::left << ">> Computing phi(3b) term" << std::endl;
-        
         wtime = get_wtime();
+        music::ilog << colors::SYM_CHECK << " " << colors::TASK_NAME << "Computing phi(3b) term" << colors::RESET << std::setw(55) << std::setfill('.') << std::left << "" << std::endl;
         phi3b.allocate();
         phi3b.zero();
         phi3b.FourierTransformForward(false);
@@ -550,8 +570,8 @@ int run( config_file& the_config )
         music::ilog << std::setw(70) << std::setfill(' ') << std::right << "took : " << std::setw(8) << get_wtime() - wtime << "s" << std::endl;
 
         //... transversal term 3c...
-        music::ilog << std::setw(71) << std::setfill('.') << std::left << ">> Computing A(3) term" << std::endl;
         wtime = get_wtime();
+        music::ilog << colors::SYM_CHECK << " " << colors::TASK_NAME << "Computing A(3) term" << colors::RESET << std::setw(58) << std::setfill('.') << std::left << "" << std::endl;
         for (int idim = 0; idim < 3; ++idim)
         {
             // cyclic rotations of indices
@@ -584,7 +604,7 @@ int run( config_file& the_config )
         }
     }
 
-    music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+    music::ilog << music::HRULE << std::endl;
 
     ///////////////////////////////////////////////////////////////////////
     // we store the densities here if we compute them
@@ -617,7 +637,7 @@ int run( config_file& the_config )
     for( const auto& this_species : species_list )
     {
         music::ilog << std::endl
-                    << ">>> Computing ICs for species \'" << cosmo_species_name[this_species] << "\' <<<\n" << std::endl;
+                    << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Computing ICs for species " << colors::SYM_ATOM << " " << colors::SPECIES << cosmo_species_name[this_species] << colors::RESET << std::endl << std::endl;
 
         // const real_t C_species = (this_species == cosmo_species::baryon)? (1.0-the_cosmo_calc->cosmo_param_["f_b"]) : -the_cosmo_calc->cosmo_param_["f_b"];
 
@@ -975,7 +995,7 @@ int run( config_file& the_config )
 
         }
         
-        music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+        music::ilog << music::HRULE << std::endl;
         
     }
     return 0;

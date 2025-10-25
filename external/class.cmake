@@ -7,13 +7,10 @@ FetchContent_Declare(
     GIT_SHALLOW YES
     GIT_PROGRESS TRUE
     USES_TERMINAL_DOWNLOAD TRUE   # <---- this is needed only for Ninja
+    PATCH_COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/CLASS_CMakeLists.txt
+        <SOURCE_DIR>/CMakeLists.txt
 )
 
-FetchContent_GetProperties(class)
-if(NOT class_POPULATED)
-    set(FETCHCONTENT_QUIET OFF)
-    FetchContent_Populate(class)
-    #configure_file(external/CLASS_CMakeLists.txt ${class_SOURCE_DIR}/CMakeLists.txt COPYONLY)
-    file(COPY_FILE external/CLASS_CMakeLists.txt ${class_SOURCE_DIR}/CMakeLists.txt )
-    add_subdirectory(${class_SOURCE_DIR} ${class_BINARY_DIR})
-endif()
+set(FETCHCONTENT_QUIET OFF)
+FetchContent_MakeAvailable(class)

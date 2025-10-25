@@ -21,6 +21,9 @@
 #include <cstdarg>
 #include <fstream>
 #include <iostream>
+#include <string>
+#include <string_view>
+#include <terminal_colors.hh>
 
 namespace music {
 
@@ -32,6 +35,8 @@ enum log_level : int {
   info    = 4,
   debug   = 5
 };
+
+inline const std::string HRULE = std::string(colors::HEADER) + "───────────────────────────────────────────────────────────────────────────────" + colors::RESET;
 
 class logger {
 private:
@@ -80,26 +85,25 @@ public:
     : logger_(logger), stream_level_(level), newline(true) {
     switch (stream_level_) {
       case log_level::fatal:
-        line_prefix_ = "\033[31mFatal : ";
+        line_prefix_ = colors::ERROR + std::string("Fatal : ");
         break;
       case log_level::error:
-        line_prefix_ = "\033[31mError : ";
+        line_prefix_ = colors::ERROR + std::string("Error : ");
         break;
       case log_level::warning:
-        line_prefix_ = "\033[33mWarning : ";
+        line_prefix_ = colors::WARNING + std::string("Warning : ");
         break;
       case log_level::info:
-        //line_prefix_ = " | Info    | ";
-        line_prefix_ = " \033[0m";
+        line_prefix_ = "";
         break;
       case log_level::debug:
-        line_prefix_ = "Debug : \033[0m";
+        line_prefix_ = colors::HIGHLIGHT + std::string("Debug : ") + colors::RESET;
         break;
       default:
-        line_prefix_ = "\033[0m";
+        line_prefix_ = colors::RESET + std::string("");
         break;
     }
-    line_postfix_ = "\033[0m";
+    line_postfix_ = colors::RESET;
   }
   ~log_stream() = default;
 

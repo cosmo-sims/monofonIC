@@ -529,7 +529,7 @@ public:
       grad_x_({ngrid_, ngrid_, ngrid_}, {1.0,1.0,1.0}), grad_y_({ngrid_, ngrid_, ngrid_}, {1.0,1.0,1.0}),
       grad_z_({ngrid_, ngrid_, ngrid_}, {1.0,1.0,1.0})
     { 
-        music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+        music::ilog << music::HRULE << std::endl;
         std::string lattice_str = the_config.get_value_safe<std::string>("setup","ParticleLoad","sc");
         const lattice lattice_type = 
             ((lattice_str=="bcc")? lattice_bcc 

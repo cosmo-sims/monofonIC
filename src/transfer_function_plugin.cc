@@ -71,7 +71,7 @@ std::unique_ptr<TransferFunction_plugin> select_TransferFunction_plugin(config_f
     }
     else
     {
-        music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+        music::ilog << music::HRULE << std::endl;
         music::ilog << std::setw(32) << std::left << "Transfer function plugin" << " : " << tfname << std::endl;
     }
 

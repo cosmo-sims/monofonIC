@@ -86,7 +86,7 @@ namespace cosmology
         //! main constructor for explicit construction from input config file
         explicit parameters( config_file &cf )
         {
-            music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+            music::ilog << music::HRULE << std::endl;
             
             if( cf.get_value_safe<std::string>("cosmology","ParameterSet","none") == std::string("none"))
             {
@@ -251,15 +251,15 @@ namespace cosmology
             pmap_["vfact"] = 0.0;
 
             music::ilog << "Cosmological parameters are: " << std::endl;
-            music::ilog << " h        = " << std::setw(16) << this->get("h");
+            music::ilog << " h        = " << colors::CONFIG_VALUE << std::setw(16) << this->get("h") << colors::RESET;
             if( this->get("A_s") > 0.0 )
-              music::ilog << "A_s      = " << std::setw(16) << this->get("A_s");
+              music::ilog << "A_s      = " << colors::CONFIG_VALUE << std::setw(16) << this->get("A_s") << colors::RESET;
             else
-              music::ilog << "sigma_8  = " << std::setw(16) << this->get("sigma_8");
-            music::ilog << "n_s     = " << std::setw(16) << this->get("n_s") << std::endl;
-            music::ilog << " Omega_c  = " << std::setw(16) << this->get("Omega_c")  << "Omega_b  = " << std::setw(16) << this->get("Omega_b") << "Omega_m = " << std::setw(16) << this->get("Omega_m") << std::endl;
-            music::ilog << " Omega_r  = " << std::setw(16) << this->get("Omega_r")  << "Omega_nu = " << std::setw(16) << this->get("Omega_nu_massive") << "∑m_nu   = " << sum_m_nu << "eV" << std::endl;
-            music::ilog << " Omega_DE = " << std::setw(16) << this->get("Omega_DE") << "w_0      = " << std::setw(16) << this->get("w_0")      << "w_a     = " << std::setw(16) << this->get("w_a") << std::endl;
+              music::ilog << "sigma_8  = " << colors::CONFIG_VALUE << std::setw(16) << this->get("sigma_8") << colors::RESET;
+            music::ilog << "n_s     = " << colors::CONFIG_VALUE << std::setw(16) << this->get("n_s") << colors::RESET << std::endl;
+            music::ilog << " Omega_c  = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_c") << colors::RESET << "Omega_b  = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_b") << colors::RESET << "Omega_m = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_m") << colors::RESET << std::endl;
+            music::ilog << " Omega_r  = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_r") << colors::RESET << "Omega_nu = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_nu_massive") << colors::RESET << "∑m_nu   = " << colors::CONFIG_VALUE << sum_m_nu << colors::RESET << "eV" << std::endl;
+            music::ilog << " Omega_DE = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_DE") << colors::RESET << "w_0      = " << colors::CONFIG_VALUE << std::setw(16) << this->get("w_0") << colors::RESET << "w_a     = " << colors::CONFIG_VALUE << std::setw(16) << this->get("w_a") << colors::RESET << std::endl;
             //music::ilog << " Omega_k  = " << 1.0 - this->get("Omega_m") - this->get("Omega_r") - this->get("Omega_DE") << std::endl;
             if (this->get("Omega_r") > 0.0)
             {
