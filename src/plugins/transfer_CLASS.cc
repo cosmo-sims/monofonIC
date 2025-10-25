@@ -171,10 +171,10 @@ private:
     // high precision options from cl_permille.pre:
     // precision file to be passed as input in order to achieve at least percent precision on scalar Cls
     add_class_parameter("hyper_flat_approximation_nu", 7000.);
-    // add_class_parameter("transfer_neglect_delta_k_S_t0", 0.17);
-    // add_class_parameter("transfer_neglect_delta_k_S_t1", 0.05);
-    // add_class_parameter("transfer_neglect_delta_k_S_t2", 0.17);
-    // add_class_parameter("transfer_neglect_delta_k_S_e", 0.13);
+    add_class_parameter("transfer_neglect_delta_k_S_t0", 0.17);
+    add_class_parameter("transfer_neglect_delta_k_S_t1", 0.05);
+    add_class_parameter("transfer_neglect_delta_k_S_t2", 0.17);
+    add_class_parameter("transfer_neglect_delta_k_S_e", 0.13);
     add_class_parameter("delta_l_max", 1000);
     int class_verbosity = 0;
 
@@ -414,10 +414,10 @@ private:
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cdm, tau, &d_cdm[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_b, tau, &d_b[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_ncdm1, tau, &d_ncdm[0]);
-    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cb, tau, &d_tot[0]);
+    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_m, tau, &d_tot[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_b, tau, &t_b[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_ncdm1, tau, &t_ncdm[0]);
-    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_cb, tau, &t_tot[0]);
+    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_m, tau, &t_tot[0]);
 
     // metric perturbations
     std::vector<double> h_prime(pt_.k_size[index_md],0.0), eta_prime(pt_.k_size[index_md],0.0);
@@ -474,7 +474,7 @@ public:
 
     // all cosmological parameters need to be passed through the_cosmo_calc
 
-    use_matter_ = pcf_->get_value_safe<bool>("cosmology", "class_use_matter", false);    
+    use_matter_ = pcf_->get_value_safe<bool>("cosmology", "class_use_matter", true);    
     ztarget_ = pcf_->get_value_safe<double>("cosmology", "ztarget", 0.0);
     atarget_ = 1.0 / (1.0 + ztarget_);
     zstart_ = pcf_->get_value<double>("setup", "zstart");
@@ -502,7 +502,7 @@ public:
     // initialise CLASS and get the normalisation
     this->init_ClassEngine();
     double A_s_ = pm_.A_s;//the_ClassEngine_->get_A_s(); // this either the input one, or the one computed from sigma8
-    
+
     // compute the normalisation to interface with MUSIC
     double k_p = cosmo_params["k_p"] / cosmo_params["h"];
     tnorm_ = std::sqrt(2.0 * M_PI * M_PI * A_s_ * std::pow(1.0 / k_p, cosmo_params["n_s"] - 1) / std::pow(2.0 * M_PI, 3.0));
