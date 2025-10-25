@@ -177,7 +177,7 @@ public:
   // use destructor to write header post factum
   ~gadget_hdf5_output_plugin()
   {
-    if (!std::uncaught_exception())
+    if (!std::uncaught_exceptions())
     {
       HDFCreateGroup(this_fname_, "Header");
       if( bgadget2_compatibility_ ){

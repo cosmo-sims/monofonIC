@@ -175,7 +175,7 @@ public:
   // use destructor to write header post factum
   ~swift_output_plugin()
   {
-    if (!std::uncaught_exception())
+    if (!std::uncaught_exceptions())
     {
       if (this_rank_  == 0) {
 
