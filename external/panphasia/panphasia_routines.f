@@ -68,35 +68,35 @@ c===============================================================================
 
 !  This module stores information needed to access the part of Panphasia
 !  selected by a particular descriptor.
-      integer*8 xorigin_store(0:1,0:1,0:1)
-      integer*8 yorigin_store(0:1,0:1,0:1)
-      integer*8 zorigin_store(0:1,0:1,0:1)
+      integer(kind=8) xorigin_store(0:1,0:1,0:1)
+      integer(kind=8) yorigin_store(0:1,0:1,0:1)
+      integer(kind=8) zorigin_store(0:1,0:1,0:1)
 
-      integer*4 lev_common
-      integer*4 layer_min_store,layer_max_store
+      integer(kind=4) lev_common
+      integer(kind=4) layer_min_store,layer_max_store
 
-      integer*8 ix_abs_store,iy_abs_store,iz_abs_store    
-      integer*8 ix_per_store,iy_per_store,iz_per_store
-      integer*8 ix_rel_store,iy_rel_store,iz_rel_store
+      integer(kind=8) ix_abs_store,iy_abs_store,iz_abs_store    
+      integer(kind=8) ix_per_store,iy_per_store,iz_per_store
+      integer(kind=8) ix_rel_store,iy_rel_store,iz_rel_store
 
-      real*8 exp_coeffs(8,0:7,-1:maxdim_)
-      integer*8 xcursor(0:maxdim_),ycursor(0:maxdim_),zcursor(0:maxdim_)
+      real(kind=8) exp_coeffs(8,0:7,-1:maxdim_)
+      integer(kind=8) xcursor(0:maxdim_),ycursor(0:maxdim_),zcursor(0:maxdim_)
 
 c    Local box parameters
 
-      integer*4 ixshift(0:1,0:1,0:1)
-      integer*4 iyshift(0:1,0:1,0:1)
-      integer*4 izshift(0:1,0:1,0:1)
+      integer(kind=4) ixshift(0:1,0:1,0:1)
+      integer(kind=4) iyshift(0:1,0:1,0:1)
+      integer(kind=4) izshift(0:1,0:1,0:1)
 
 
 c     more state variables
-      real*8 cell_data(9,0:7)
-      integer*4 ixh_last,iyh_last,izh_last
+      real(kind=8) cell_data(9,0:7)
+      integer(kind=4) ixh_last,iyh_last,izh_last
       integer init
 
       integer return_cell_props_init
       integer reset_lecuyer_state_init
-      integer*8 p_xcursor(indmin:indmax),p_ycursor(indmin:indmax),p_zcursor(indmin:indmax)
+      integer(kind=8) p_xcursor(indmin:indmax),p_ycursor(indmin:indmax),p_zcursor(indmin:indmax)
 
 
 
@@ -106,7 +106,7 @@ c     more state variables
 
 c     Switch for enabling custom spherical function
 c     Set isub_spherical_function = 1 to turn on the spherical function
-      integer*4 isub_spherical_function
+      integer(kind=4) isub_spherical_function
       parameter (isub_spherical_function=0)
 
       end module pan_state
@@ -119,24 +119,24 @@ c===============================================================================
       use pan_state
       implicit none
       type(state_data), intent(inout) :: ldata
-      character*100 descriptor
+      character(len=100) descriptor
       integer ngrid
       integer VERBOSE
 
       
 
-      integer*4 wn_level_base,i_base,i_base_y,i_base_z
-      integer*8 i_xorigin_base,i_yorigin_base,i_zorigin_base, check_rand
-      character*20 name
+      integer(kind=4) wn_level_base,i_base,i_base_y,i_base_z
+      integer(kind=8) i_xorigin_base,i_yorigin_base,i_zorigin_base, check_rand
+      character(len=20) name
 
       integer ratio
       integer lextra
       integer level_p
 
       
-      integer*8 ix_abs,iy_abs,iz_abs
-      integer*8 ix_per,iy_per,iz_per
-      integer*8 ix_rel,iy_rel,iz_rel
+      integer(kind=8) ix_abs,iy_abs,iz_abs
+      integer(kind=8) ix_per,iy_per,iz_per
+      integer(kind=8) ix_rel,iy_rel,iz_rel
       
       !integer  layer_min,layer_max,indep_field
       !common /oct_range/  layer_min,layer_max,indep_field
@@ -183,27 +183,27 @@ c===============================================================================
       !use descriptor_phases
       implicit none
       type(state_data), intent(inout) :: ldata
-      character*100 descriptor
+      character(len=100) descriptor
       integer lev
-      integer*8 ix_abs,iy_abs,iz_abs
-      integer*8 ix_per,iy_per,iz_per
-      integer*8 ix_rel,iy_rel,iz_rel
-      integer*8 xorigin,yorigin,zorigin
+      integer(kind=8) ix_abs,iy_abs,iz_abs
+      integer(kind=8) ix_per,iy_per,iz_per
+      integer(kind=8) ix_rel,iy_rel,iz_rel
+      integer(kind=8) xorigin,yorigin,zorigin
 
       integer VERBOSE
       integer MYID
-      integer*8 maxco
+      integer(kind=8) maxco
       integer i
       integer px,py,pz
       
       integer lnblnk
-      integer*8 mconst
+      integer(kind=8) mconst
       parameter(mconst = 2147483647_Dint)
 
-      integer*4 wn_level_base,i_base,i_base_y,i_base_z
-      integer*8 i_xorigin_base,i_yorigin_base,i_zorigin_base, check_rand
+      integer(kind=4) wn_level_base,i_base,i_base_y,i_base_z
+      integer(kind=8) i_xorigin_base,i_yorigin_base,i_zorigin_base, check_rand
       integer lextra,ratio
-      character*20 phase_name
+      character(len=20) phase_name
 
 c-----------------------------------------------------------------------------------------------
 
@@ -328,7 +328,7 @@ c===============================================================================
       integer ninitialise
       parameter (ninitialise=218)
       integer i
-      real*8 rand_num
+      real(kind=8) rand_num
 
 
       call Rand_seed(state,ninitialise)
@@ -386,8 +386,8 @@ c===============================================================================
       type(state_data), intent(inout) :: ldata
       !integer  layer_min,layer_max,indep_field
       !common /oct_range/  layer_min,layer_max,indep_field
-      integer*4 ixcell,iycell,izcell
-      real*8 cell_prop(9)
+      integer(kind=4) ixcell,iycell,izcell
+      real(kind=8) cell_prop(9)
 
       call adv_panphasia_cell_properties(ldata,ixcell,iycell,izcell,ldata%layer_min,
      &                                           ldata%layer_max,ldata%indep_field,cell_prop)
@@ -402,21 +402,21 @@ c===============================================================================
 
       type(state_data), intent(inout) :: ldata
 
-      integer*4 lev
-      integer*4 ixcell,iycell,izcell
+      integer(kind=4) lev
+      integer(kind=4) ixcell,iycell,izcell
       integer layer_min,layer_max,indep_field
-      real*8 cell_prop(9)
-c      real*8 cell_data(9,0:7)
-      integer*4 j,l,lx,ly,lz
-      integer*4 px,py,pz
+      real(kind=8) cell_prop(9)
+c      real(kind=8) cell_data(9,0:7)
+      integer(kind=4) j,l,lx,ly,lz
+      integer(kind=4) px,py,pz
 
-c      integer*4 ixh_last,iyh_last,izh_last
+c      integer(kind=4) ixh_last,iyh_last,izh_last
 
 c      integer init
 c      data init/0/
 c      save init,cell_data,ixh_last,iyh_last,izh_last  ! Keep internal state
 
-      integer*4 ixh,iyh,izh
+      integer(kind=4) ixh,iyh,izh
 
       lev = ldata%lev_common
 
@@ -511,11 +511,11 @@ c===============================================================================
       type(state_data), intent(inout) :: ldata
       integer lev_input,ix_half,iy_half,iz_half,px,py,pz
       integer layer_min,layer_max,indep_field 
-      real*8 cell_data(9,0:7)
+      real(kind=8) cell_data(9,0:7)
 
-      real*8 garray(0:63)
+      real(kind=8) garray(0:63)
       integer lev
-      integer*8 xarray,yarray,zarray
+      integer(kind=8) xarray,yarray,zarray
 
       integer i,istart,icell_name
 
@@ -652,12 +652,12 @@ c----------------- Define subroutine arguments ---------------------------------
       integer nlev,maxdim
       integer layer_min,layer_max,indep_field
       integer icell_name
-      real*8 leg_coeff(0:7,0:7,-1:maxdim),cell_data(0:8,0:7)
-      real*8 g(*)
+      real(kind=8) leg_coeff(0:7,0:7,-1:maxdim),cell_data(0:8,0:7)
+      real(kind=8) g(*)
 
 c----------------- Define constants using notation from appendix A of Jenkins 2013
  
-      real*8 a1,a2,b1,b2,b3,c1,c2,c3,c4
+      real(kind=8) a1,a2,b1,b2,b3,c1,c2,c3,c4
 
       parameter(a1 = 0.5d0*sqrt(3.0d0),      a2 = 0.5d0)
 
@@ -669,15 +669,15 @@ c----------------- Define constants using notation from appendix A of Jenkins 20
 
 c----------------- Define octree variables --------------------------------
 
-      real*8 coeff_p000, coeff_p001, coeff_p010, coeff_p011
-      real*8 coeff_p100, coeff_p101, coeff_p110, coeff_p111
+      real(kind=8) coeff_p000, coeff_p001, coeff_p010, coeff_p011
+      real(kind=8) coeff_p100, coeff_p101, coeff_p110, coeff_p111
 
-      real*8 positive_octant_lc(0:7,0:1,0:1,0:1),temp_value(0:7,0:7)
+      real(kind=8) positive_octant_lc(0:7,0:1,0:1,0:1),temp_value(0:7,0:7)
       integer i,j,ix,iy,iz
       integer icx,icy,icz
       integer iox,ioy,ioz
-      real*8 parity,isig
-      real*8 usually_rooteighth_factor
+      real(kind=8) parity,isig
+      real(kind=8) usually_rooteighth_factor
 c--------------------------------------------------------------------------
 
 c-------------  Set the Legendre block coefficients for the parent cell
@@ -966,11 +966,11 @@ c===============================================================================
       
       type(state_data), intent(inout) :: ldata
       integer lev
-      integer*8 xcursor,ycursor,zcursor
+      integer(kind=8) xcursor,ycursor,zcursor
 
 c      integer indmin,indmax
 c      parameter (indmin=-1, indmax=60)
-c      integer*8 p_xcursor(indmin:indmax),p_ycursor(indmin:indmax),p_zcursor(indmin:indmax)
+c      integer(kind=8) p_xcursor(indmin:indmax),p_ycursor(indmin:indmax),p_zcursor(indmin:indmax)
 c      save p_xcursor,p_ycursor,p_zcursor
       integer i
 c      integer init
@@ -1013,15 +1013,15 @@ c===============================================================================
       type(state_data), intent(inout) :: ldata
 
       integer lev
-      integer*8 x,y,z
+      integer(kind=8) x,y,z
 
-      integer*8 lev_range
+      integer(kind=8) lev_range
 
       TYPE(Rand_offset) :: offset1,offset2
       TYPE(Rand_offset) :: offset_x,offset_y,offset_z,offset_total
 
       integer ndiv,nrem
-      integer*8 ndiv8,nrem8
+      integer(kind=8) ndiv8,nrem8
       integer nfactor
       parameter (nfactor=291071) ! Value unimportant except has to be > 262144
 
@@ -1044,8 +1044,8 @@ c-----   First some error checking ------------------------------------------
       if ((z.lt.0).or.(z.ge.lev_range)) stop 'z out of range!' 
 c----------------------------------------------------------------------------          
 c
-c Note the Rand_set_offset subroutine takes an integer*4 value
-c for the offset value. For this reason we need to use integer*4
+c Note the Rand_set_offset subroutine takes an integer(kind=4) value
+c for the offset value. For this reason we need to use integer(kind=4)
 c values - ndiv,nrem.  As a precaution an explicit check is made
 c to be sure that these values are calculated correctly.
 c---------------------------------------------------------------------------
@@ -1117,15 +1117,15 @@ c===============================================================================
       implicit none 
       type(state_data), intent(inout) :: ldata
       integer lev,ngauss
-      real*8 garray(0:*)
+      real(kind=8) garray(0:*)
       TYPE(Rand_state) :: state
-      real*8 PI
+      real(kind=8) PI
       parameter (PI=3.1415926535897932384d0)
-      real*8 branch
+      real(kind=8) branch
       parameter (branch=1.d-6)
       integer iloop
 
-      real*8 temp,mag,ang
+      real(kind=8) temp,mag,ang
       integer i
 
       if (mod(ngauss,2).ne.0) 
@@ -1178,11 +1178,11 @@ c===============================================================================
       implicit none
       integer nchar
       parameter(nchar=100)
-      character*100  string
-      integer*4 l,side1,side2,side3,ierror
-      integer*8 ix,iy,iz
-      integer*8 check_int
-      character*20 name
+      character(len=100)  string
+      integer(kind=4) l,side1,side2,side3,ierror
+      integer(kind=8) ix,iy,iz
+      integer(kind=8) check_int
+      character(len=20) name
 
 
       integer i,ip,iq,ir
@@ -1333,14 +1333,14 @@ c===============================================================================
       implicit none
       integer nchar
       parameter(nchar=100)
-      character*100,intent(out)::string
-      character*20 name
-      integer*4 l,ltemp
-      integer*8 side
-      integer*8 ix,iy,iz
-      integer*8 check_int
+      character(len=100),intent(out)::string
+      character(len=20) name
+      integer(kind=4) l,ltemp
+      integer(kind=8) side
+      integer(kind=8) ix,iy,iz
+      integer(kind=8) check_int
 
-      character*50 temp1,temp2,temp3,temp4,temp5,temp6
+      character(len=50) temp1,temp2,temp3,temp4,temp5,temp6
       integer lnblnk
 
       integer ip1,ip2,ip3,ip4,ip5,ip6
@@ -1386,29 +1386,29 @@ c===============================================================================
       implicit none
 
       type(state_data), intent(inout) :: ldata
-      character*100 string
-      integer*8 check_number
+      character(len=100) string
+      integer(kind=8) check_number
       integer MYID
 
-      character*20 phase_name
-      integer*4 lev
+      character(len=20) phase_name
+      integer(kind=4) lev
 
-      integer*8 ix_abs,iy_abs,iz_abs
-      integer*4 ix_base,iy_base,iz_base
+      integer(kind=8) ix_abs,iy_abs,iz_abs
+      integer(kind=4) ix_base,iy_base,iz_base
       
 
-      integer*8 xval,yval,zval
+      integer(kind=8) xval,yval,zval
       integer val_state(5)
 
       TYPE(Rand_state) :: state
 
-      real*8 rand_num
-      integer*8 mconst,check_total,check_rand
+      real(kind=8) rand_num
+      integer(kind=8) mconst,check_total,check_rand
       parameter(mconst = 2147483647_Dint)
       integer ascii_list(0:255)
-      integer*8 maxco
+      integer(kind=8) maxco
       integer i
-      integer*8 ii
+      integer(kind=8) ii
       integer lnblnk
       
 
@@ -1529,32 +1529,32 @@ c===============================================================================
       use pan_state
       implicit none
       type(state_data), intent(inout) :: ldata
-      character*100  string
-      character*100  instring
-      character*20   name
-      integer*4 unix_timestamp
+      character(len=100)  string
+      character(len=100)  instring
+      character(len=20)   name
+      integer(kind=4) unix_timestamp
 
-      real*8 lbox
-      real*8 lpanphasia
+      real(kind=8) lbox
+      real(kind=8) lpanphasia
       parameter (lpanphasia = 25000000.0)  ! Units of Mpc/h
       integer level
-      integer*8 cell_dim
+      integer(kind=8) cell_dim
       integer val_state(5)
 
       TYPE(Rand_state) :: state
       TYPE(Rand_offset) :: offset
 
-      real*8 rand_num1,rand_num2
-      integer*8 mconst,check_int
+      real(kind=8) rand_num1,rand_num2
+      integer(kind=8) mconst,check_int
       parameter(mconst = 2147483647_Dint)
-      integer*8 mfac,imajor,iminor
+      integer(kind=8) mfac,imajor,iminor
       parameter(mfac=33554332_Dint)
       integer ascii_list(0:255)
       integer i,lnblnk
-      integer*8 ii
+      integer(kind=8) ii
       integer mult
 
-      integer*8 ixco,iyco,izco,irange
+      integer(kind=8) ixco,iyco,izco,irange
 
       print*,'___________________________________________________________'
       print*
@@ -1721,18 +1721,18 @@ c===============================================================================
       integer nmax
       parameter (nmax=10)
 
-      integer*4 wn_level(nmax)
+      integer(kind=4) wn_level(nmax)
 
-      integer*8 ix_abs(nmax),iy_abs(nmax),iz_abs(nmax)
-      integer*8 ix_per(nmax),iy_per(nmax),iz_per(nmax)
-      integer*8 ix_rel(nmax),iy_rel(nmax),iz_rel(nmax)
-      integer*8 ix_dim(nmax),iy_dim(nmax),iz_dim(nmax)
+      integer(kind=8) ix_abs(nmax),iy_abs(nmax),iz_abs(nmax)
+      integer(kind=8) ix_per(nmax),iy_per(nmax),iz_per(nmax)
+      integer(kind=8) ix_rel(nmax),iy_rel(nmax),iz_rel(nmax)
+      integer(kind=8) ix_dim(nmax),iy_dim(nmax),iz_dim(nmax)
 
       integer ix,iy,iz,nref
       integer layer_min,layer_max,indep_field
 
 
-      integer*8 itot_int,itot_ib
+      integer(kind=8) itot_int,itot_ib
 
       integer inv_open
 
@@ -1854,10 +1854,10 @@ c===============================================================================
       integer ix,iy,iz,irefplus
       integer ione
 
-      integer*8 ix_abs(nref),iy_abs(nref),iz_abs(nref)
-      integer*8 ix_per(nref),iy_per(nref),iz_per(nref)
-      integer*8 ix_rel(nref),iy_rel(nref),iz_rel(nref)
-      integer*8 ix_dim(nref),iy_dim(nref),iz_dim(nref)
+      integer(kind=8) ix_abs(nref),iy_abs(nref),iz_abs(nref)
+      integer(kind=8) ix_per(nref),iy_per(nref),iz_per(nref)
+      integer(kind=8) ix_rel(nref),iy_rel(nref),iz_rel(nref)
+      integer(kind=8) ix_dim(nref),iy_dim(nref),iz_dim(nref)
 
       integer wn_level(nref)
       integer layer_min,layer_max,indep_field,x_fact
@@ -2040,17 +2040,17 @@ c===============================================================================
       integer nref
       integer ixc,iyc,izc,isz,ir1,ir2
       integer wn_level(nref)
-      integer*8 ix_abs(nref),iy_abs(nref),iz_abs(nref)
-      integer*8 ix_per(nref),iy_per(nref),iz_per(nref)
-      integer*8 ix_rel(nref),iy_rel(nref),iz_rel(nref)
-      integer*8 ix_dim(nref),iy_dim(nref),iz_dim(nref)
+      integer(kind=8) ix_abs(nref),iy_abs(nref),iz_abs(nref)
+      integer(kind=8) ix_per(nref),iy_per(nref),iz_per(nref)
+      integer(kind=8) ix_rel(nref),iy_rel(nref),iz_rel(nref)
+      integer(kind=8) ix_dim(nref),iy_dim(nref),iz_dim(nref)
       integer interior, iboundary
       integer x_fact
      
-      integer*8 ixco,iyco,izco,isize
-      integer*8 ixref0,iyref0,izref0
-      integer*8 ixref1,iyref1,izref1
-      integer*8 idist
+      integer(kind=8) ixco,iyco,izco,isize
+      integer(kind=8) ixref0,iyref0,izref0
+      integer(kind=8) ixref1,iyref1,izref1
+      integer(kind=8) idist
 
       integer delta_wn
 
@@ -2059,7 +2059,7 @@ c   Error checking
       if ((ir1.lt.1).or.(ir2.gt.nref)) 
      &  stop 'Either/or ir1,ir2 out of range'
 
-c  First copy coordinates to integer*8 variables
+c  First copy coordinates to integer(kind=8) variables
 
       ixco = ixc
       iyco = iyc
@@ -2143,23 +2143,23 @@ c===============================================================================
 
 
       integer lev
-      integer*8 ix_abs,iy_abs,iz_abs
-      integer*8 ix_per,iy_per,iz_per
-      integer*8 ix_rel,iy_rel,iz_rel
-      integer*8 xorigin,yorigin,zorigin
+      integer(kind=8) ix_abs,iy_abs,iz_abs
+      integer(kind=8) ix_per,iy_per,iz_per
+      integer(kind=8) ix_rel,iy_rel,iz_rel
+      integer(kind=8) xorigin,yorigin,zorigin
       integer wn_level_base
-      integer*8 check_rand
-      character*20 phase_name
+      integer(kind=8) check_rand
+      character(len=20) phase_name
       integer MYID
-      integer*8 maxco
+      integer(kind=8) maxco
       integer i
       integer px,py,pz
 
-      integer*8 xval,yval,zval,val_side
+      integer(kind=8) xval,yval,zval,val_side
       integer lev_val
-      character*100 outstring
+      character(len=100) outstring
       integer lnblnk
-      integer*8 mconst
+      integer(kind=8) mconst
       parameter(mconst = 2147483647_Dint)
 c-------------------------------------------------------------------------
 
@@ -2287,23 +2287,23 @@ c-------------------------------------------------------------------------------
 
       integer ii,jj
       integer lev,ndim
-      real*8 garray(0:ndim-1)
-      integer*8 x,y,z 
-      real*8 xorig,yorig,zorig
-      real*8 cell_data(0:8,0:7) 
+      real(kind=8) garray(0:ndim-1)
+      integer(kind=8) x,y,z 
+      real(kind=8) xorig,yorig,zorig
+      real(kind=8) cell_data(0:8,0:7) 
 
 c  Debugging variables ....      
 
-      integer*8 xtemp,ytemp,ztemp
+      integer(kind=8) xtemp,ytemp,ztemp
       integer ndimension
      
-      integer*8 pstore,xstore,ystore,zstore
+      integer(kind=8) pstore,xstore,ystore,zstore
 
 
       integer i,j
 c-------------------------------------------------------------------------------
-      real*8 length,cube_centre(3),oct_cell_data(0:8,0:7)
-      integer*8 lev_range
+      real(kind=8) length,cube_centre(3),oct_cell_data(0:8,0:7)
+      integer(kind=8) lev_range
 c-----   First some error checking ------------------------------------------
       if ((lev.lt.0).or.(lev.gt.maxlev_)) stop 'Level out of range! (2)'
       lev_range = 2_dint**lev
@@ -2351,16 +2351,16 @@ c   functions
 c-------------------------------------------------------------------------------    
       recursive subroutine octree_expansion(cube_centre,length,ndim,q)
       implicit none
-      real*8 cube_centre(3),length,oct_cell_data(0:8,0:7)
+      real(kind=8) cube_centre(3),length,oct_cell_data(0:8,0:7)
 
-      real*8 local_centre(3), small_data(0:8,0:7),small_len
-      real*8 temp_data(0:8)
+      real(kind=8) local_centre(3), small_data(0:8,0:7),small_len
+      real(kind=8) temp_data(0:8)
 
-      real*8 moment(0:7)
+      real(kind=8) moment(0:7)
       integer ndim
 
 
-      real*8 p(0:7),q(ndim)
+      real(kind=8) p(0:7),q(ndim)
 
 
       integer ix,iy,iz,ind1,ind2
@@ -2396,18 +2396,18 @@ c-------------------------------------------------------------------------------
 
       recursive subroutine spherical_perturbation(cube_centre,length,cell_data)
       implicit none
-      real*8 cube_centre(3),length,cell_data(0:8)
+      real(kind=8) cube_centre(3),length,cell_data(0:8)
       integer nfeature, nuse 
 
       parameter (nfeature=5,nuse=1)
       
-      real*8 centre(3), amplitude(nfeature), sigma(nfeature)
+      real(kind=8) centre(3), amplitude(nfeature), sigma(nfeature)
 
       integer i,j
-      real*8 cell_data_temp(0:8)
-      real*8 pcentre(3),scaled_length
-      real*8 CellVolume
-      real*8 prefac0,prefac1,prefac2,prefac3
+      real(kind=8) cell_data_temp(0:8)
+      real(kind=8) pcentre(3),scaled_length
+      real(kind=8) CellVolume
+      real(kind=8) prefac0,prefac1,prefac2,prefac3
 
 c   Set the parameters of the perturbation.  The periodic volume is
 c   a cube of unit length, occupying the positive coordinate octant
@@ -2507,18 +2507,18 @@ c  of incomplete Gamma functions
 c
 c---------------------------------------------------------------------------
       implicit none
-      real*8 pos_cen(3),len,cell_data(0:8)
+      real(kind=8) pos_cen(3),len,cell_data(0:8)
 
-      real*8 pos_min(3),pos_max(3)
-      real*8 abs_u_min(3),abs_u_max(3)
-      real*8 a(0:3),c(0:3),s(0:3),p_min,p_max
-      real*8 stretch
-      real*8 gammp
+      real(kind=8) pos_min(3),pos_max(3)
+      real(kind=8) abs_u_min(3),abs_u_max(3)
+      real(kind=8) a(0:3),c(0:3),s(0:3),p_min,p_max
+      real(kind=8) stretch
+      real(kind=8) gammp
 
-      real*8 si(0:3,3),ti(0:3,3)
+      real(kind=8) si(0:3,3),ti(0:3,3)
 
-      real*8 Coeff000,Coeff001,Coeff010,Coeff011
-      real*8 Coeff100,Coeff101,Coeff110,Coeff111
+      real(kind=8) Coeff000,Coeff001,Coeff010,Coeff011
+      real(kind=8) Coeff100,Coeff101,Coeff110,Coeff111
 
       integer i,j,n
 
@@ -2729,10 +2729,10 @@ c   output double precision.  Routines taken from the Blue f77 Book
 c   Value of EPS changed from 3e-7 to 3e-15, ITMAX increased from 100 to 200
 c=========================================================================
 
-      REAL*8 recursive FUNCTION gammp(a,x)
-      REAL*8 a,x
+      real(kind=8) recursive FUNCTION gammp(a,x)
+      real(kind=8) a,x
 CU    USES gcf,gser
-      REAL*8 gammcf,gamser,gln
+      real(kind=8) gammcf,gamser,gln
       if(x.lt.0..or.a.le.0.)stop 'bad arguments in gammp'
       if(x.lt.a+1.)then
         call gser(gamser,a,x,gln)
@@ -2746,11 +2746,11 @@ CU    USES gcf,gser
 
       recursive SUBROUTINE gcf(gammcf,a,x,gln)
       INTEGER ITMAX
-      REAL*8 a,gammcf,gln,x,EPS,FPMIN
+      real(kind=8) a,gammcf,gln,x,EPS,FPMIN
       PARAMETER (ITMAX=200,EPS=3.d-15,FPMIN=1.d-290)
 CU    USES gammln
       INTEGER i
-      REAL*8 an,b,c,d,del,h,gammln
+      real(kind=8) an,b,c,d,del,h,gammln
       gln=gammln(a)
       b=x+1.-a
       c=1./FPMIN
@@ -2775,11 +2775,11 @@ CU    USES gammln
 
       SUBROUTINE gser(gamser,a,x,gln)
       INTEGER ITMAX
-      REAL*8 a,gamser,gln,x,EPS
+      real(kind=8) a,gamser,gln,x,EPS
       PARAMETER (ITMAX=200,EPS=3.d-15)
 CU    USES gammln
       INTEGER n
-      REAL*8 ap,del,sum,gammln
+      real(kind=8) ap,del,sum,gammln
       gln=gammln(a)
       if(x.le.0.)then
         if(x.lt.0.)stop 'x < 0 in gser'
@@ -2801,10 +2801,10 @@ CU    USES gammln
       END
 
 
-      REAL*8 recursive FUNCTION gammln(xx)
-      REAL*8 xx
+      real(kind=8) recursive FUNCTION gammln(xx)
+      real(kind=8) xx
       INTEGER j
-      REAL*8 ser,stp,tmp,x,y,cof(6)
+      real(kind=8) ser,stp,tmp,x,y,cof(6)
       SAVE cof,stp
       DATA cof,stp/76.18009172947146d0,-86.50532032941677d0,
      *24.01409824083091d0,-1.231739572450155d0,.1208650973866179d-2,
@@ -2826,12 +2826,12 @@ c===============================================================================
       recursive subroutine expand_octree_coefficients(cell_data, p,q)
       implicit none
 c----------------- Define subroutine arguments -----------------------------------
-      real*8 cell_data(0:8,0:7)
-      real*8 p(0:7),q(56)
+      real(kind=8) cell_data(0:8,0:7)
+      real(kind=8) p(0:7),q(56)
 
 c----------------- Define constants using notation from appendix A of Jenkins 2013
  
-      real*8 a1,a2,b1,b2,b3,c1,c2,c3,c4,rooteighth_factor
+      real(kind=8) a1,a2,b1,b2,b3,c1,c2,c3,c4,rooteighth_factor
 
       parameter(a1 = 0.5d0*sqrt(3.0d0),      a2 = 0.5d0)
 
@@ -2845,12 +2845,12 @@ c----------------- Define constants using notation from appendix A of Jenkins 20
 
 c----------------- Define octree variables --------------------------------
 
-      real*8 po(0:7,0:7),tsum(0:7,0:7)
+      real(kind=8) po(0:7,0:7),tsum(0:7,0:7)
       integer iparity
       integer i,j,ix,iy,iz
       integer icx,icy,icz
       integer iox,ioy,ioz
-      real*8 parity,isig
+      real(kind=8) parity,isig
 c-----------------------------------------------------------------------------
 
 c 
@@ -3080,12 +3080,12 @@ c===============================================================================
       recursive subroutine compound_octree_coefficients(p,q,cell_data)
       implicit none
 c----------------- Define subroutine arguments -----------------------------------
-      real*8 cell_data(0:8,0:7)
-      real*8 p(0:7),q(56)
+      real(kind=8) cell_data(0:8,0:7)
+      real(kind=8) p(0:7),q(56)
 
 c----------------- Define constants using notation from appendix A of Jenkins 2013
  
-      real*8 a1,a2,b1,b2,b3,c1,c2,c3,c4,rooteighth_factor
+      real(kind=8) a1,a2,b1,b2,b3,c1,c2,c3,c4,rooteighth_factor
 
       parameter(a1 = 0.5d0*sqrt(3.0d0),      a2 = 0.5d0)
 
@@ -3099,12 +3099,12 @@ c----------------- Define constants using notation from appendix A of Jenkins 20
 
 c----------------- Define octree variables --------------------------------
 
-      real*8 po(0:7,0:7),tsum(0:7,0:7)
+      real(kind=8) po(0:7,0:7),tsum(0:7,0:7)
       integer iparity
       integer i,j,ix,iy,iz
       integer icx,icy,icz
       integer iox,ioy,ioz
-      real*8 parity,isig
+      real(kind=8) parity,isig
 c-----------------------------------------------------------------------------
 c
 c

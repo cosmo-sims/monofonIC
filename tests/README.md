@@ -260,9 +260,8 @@ If tests fail in CI:
 ### Why Small Tests?
 
 - **Fast execution**: 32³ grid completes in seconds
-- **Frequent CI runs**: Developers get quick feedback
+- **Frequent CI runs**: Fast detection of regressions
 - **Low storage**: Reference files are small (~few MB total)
-- **Still comprehensive**: Captures algorithm and output format correctness
 
 ### What Tests Catch
 
@@ -270,7 +269,6 @@ If tests fail in CI:
 ✓ Changes to particle positions/velocities
 ✓ Changes to LPT algorithm implementation
 ✓ Output format modifications
-✓ Baryon physics changes
 ✓ RNG differences
 ✓ Cosmology calculation errors
 
@@ -280,18 +278,121 @@ If tests fail in CI:
 ✓ MPI communication bugs
 ✓ Non-deterministic RNG across different MPI task counts
 
-**Not Covered:**
-✗ Performance regressions (not measured)
-✗ Large-scale/convergence behavior (use full-scale tests)
 
-## Future Enhancements
+## Transfer Function Regression Tests
 
-Potential improvements to the test suite:
+In addition to the full IC generation regression tests above, monofonIC includes a dedicated test suite for transfer function plugins.
 
-- [ ] Test CLASS transfer function integration (separate from these fast tests)
-- [ ] Add glass initial conditions test
+### Overview
 
-## Questions or Issues?
+Transfer function tests validate that the transfer function plugins (CLASS, eisenstein, eisenstein_wdm) produce consistent outputs across code changes (also of the CLASS codebase).
 
-- Report test-related issues on GitHub: https://github.com/cosmo-sims/monofonIC/issues
-- Join the MUSIC user group: https://groups.google.com/g/cosmo_music
+### Test Design
+
+**Test Program**: `test_transfer_functions`
+- Standalone C++ program that directly tests transfer function plugins
+- Evaluates transfer functions at 100 logarithmically-spaced k values (10⁻⁴ to 10 h/Mpc)
+- Outputs 6 transfer function types: δ_matter, δ_CDM, δ_baryon, θ_matter, θ_CDM, θ_baryon
+- Supports `--generate` (create references) and `--test` (compare) modes
+
+**Reference Format**: Text files (`tests/references/transfer/`)
+- Human-readable space-separated columns: k, δ_m, δ_c, δ_b, θ_m, θ_c, θ_b
+- Organized by plugin: `CLASS/`, `eisenstein/`
+
+**Comparison**: Python script (`compare_transfer_functions.py`)
+- Relative tolerance: 1e-6 (relaxed, suitable for physics validation)
+- Reports max relative difference and k values where failures occur
+
+### Test Configurations
+
+Five parameter combinations test different physics:
+
+| Config | Description | Parameters |
+|--------|-------------|------------|
+| `fiducial` | Planck2018 ΛCDM baseline | ztarget=2.5 |
+| `dark_energy` | w0-waCDM model | w0=-0.9, wa=0.1 |
+| `massive_nu` | Massive neutrinos | m_nu1=0.06 eV |
+| `low_omega_m` | Low matter density | Omega_m=0.25 |
+| `high_z` | High redshift | ztarget=10 |
+
+### Plugin Coverage
+
+| Plugin | Configs Tested | Notes |
+|--------|----------------|-------|
+| `CLASS` | All 5 | Full Einstein-Boltzmann solver (requires ENABLE_CLASS=ON) |
+| `eisenstein` | All 5 | Eisenstein & Hu 1999 fitting formulae |
+
+**Total**: 10 test cases
+
+### Running Transfer Function Tests
+
+```bash
+# Build (if not already built)
+cd build
+make test_transfer_functions
+
+# Generate reference files (only needed once)
+bash ../tests/scripts/generate_transfer_references.sh
+
+# Run all transfer function tests
+ctest -R test_transfer --output-on-failure
+
+# Run specific plugin tests
+ctest -R test_transfer_CLASS --verbose
+ctest -R test_transfer_eisenstein --verbose
+
+# Run specific configuration
+ctest -R test_transfer_CLASS_fiducial --verbose
+```
+
+### Manual Testing
+
+You can also run the test program directly:
+
+```bash
+cd build
+
+# Generate reference for CLASS plugin with fiducial config
+./test_transfer_functions --generate CLASS \
+    ../tests/configs/transfer/fiducial.conf \
+    fiducial_ref.txt
+
+# Test against reference
+./test_transfer_functions --test CLASS \
+    ../tests/configs/transfer/fiducial.conf \
+    ../tests/references/transfer/CLASS/fiducial.txt \
+    1e-6  # optional: custom tolerance
+```
+
+### Regenerating Transfer Function References
+
+When intentional changes are made to transfer function calculations:
+
+```bash
+cd build
+
+# Regenerate all references
+bash ../tests/scripts/generate_transfer_references.sh
+
+# Verify tests pass
+ctest -R test_transfer --output-on-failure
+
+# Commit updated references
+git add ../tests/references/transfer/
+git commit -m "Update transfer function references after [description]"
+```
+
+### What These Tests Catch
+
+✓ Transfer function calculation changes (physics or numerical)
+✓ Cosmological parameter handling bugs (w0, wa, m_nu, Omega_m, ztarget)
+✓ Plugin compatibility and consistency
+✓ Regressions from CLASS library updates
+✓ k-range and edge case handling
+
+### Integration with CI
+
+Transfer function tests run automatically in GitHub Actions CI:
+- Executed on every push/PR to `master`
+- Separate from IC generation tests 
+

@@ -21,8 +21,20 @@
 #include <cstdarg>
 #include <fstream>
 #include <iostream>
+#include <string>
+#include <string_view>
+#include <sstream>
+#include <regex>
+#include <type_traits>
+#include <terminal_colors.hh>
 
 namespace music {
+
+// Helper function to strip ANSI color codes from strings
+inline std::string strip_ansi_codes(const std::string& str) {
+  static const std::regex ansi_regex("\033\\[[0-9;]*m");
+  return std::regex_replace(str, ansi_regex, "");
+}
 
 enum log_level : int {
   off     = 0,
@@ -32,6 +44,8 @@ enum log_level : int {
   info    = 4,
   debug   = 5
 };
+
+inline const std::string HRULE = std::string(colors::HEADER) + "───────────────────────────────────────────────────────────────────────────────" + colors::RESET;
 
 class logger {
 private:
@@ -53,7 +67,17 @@ public:
   template <typename T> logger &operator<<(const T &item) {
     std::cout << item;
     if (output_file_.is_open()) {
-      output_file_ << item;
+      // Only strip ANSI codes from string types, pass everything else through
+      // to preserve stream formatting (e.g., std::setw)
+      using bare_type = typename std::decay<T>::type;
+      if constexpr (std::is_same_v<bare_type, std::string> ||
+                    std::is_same_v<bare_type, const char*> ||
+                    std::is_same_v<bare_type, char*>) {
+        std::string str_item = item;
+        output_file_ << strip_ansi_codes(str_item);
+      } else {
+        output_file_ << item;
+      }
     }
     return *this;
   }
@@ -80,26 +104,25 @@ public:
     : logger_(logger), stream_level_(level), newline(true) {
     switch (stream_level_) {
       case log_level::fatal:
-        line_prefix_ = "\033[31mFatal : ";
+        line_prefix_ = colors::ERROR + std::string("Fatal : ");
         break;
       case log_level::error:
-        line_prefix_ = "\033[31mError : ";
+        line_prefix_ = colors::ERROR + std::string("Error : ");
         break;
       case log_level::warning:
-        line_prefix_ = "\033[33mWarning : ";
+        line_prefix_ = colors::WARNING + std::string("Warning : ");
         break;
       case log_level::info:
-        //line_prefix_ = " | Info    | ";
-        line_prefix_ = " \033[0m";
+        line_prefix_ = "";
         break;
       case log_level::debug:
-        line_prefix_ = "Debug : \033[0m";
+        line_prefix_ = colors::HIGHLIGHT + std::string("Debug : ") + colors::RESET;
         break;
       default:
-        line_prefix_ = "\033[0m";
+        line_prefix_ = colors::RESET + std::string("");
         break;
     }
-    line_postfix_ = "\033[0m";
+    line_postfix_ = colors::RESET;
   }
   ~log_stream() = default;
 
@@ -134,8 +157,8 @@ public:
     vsprintf(out, str, argptr);
     va_end(argptr);
     std::string out_string = std::string(out);
-    out_string.erase(std::remove(out_string.begin(), out_string.end(), '\n'),
-                     out_string.end());
+    // out_string.erase(std::remove(out_string.begin(), out_string.end(), '\n'),
+    //                  out_string.end());
     (*this) << out_string << std::endl;
   }
 };
