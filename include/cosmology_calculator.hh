@@ -35,7 +35,9 @@ namespace cosmology
 {
 //! structure for ODE parameters required to evaluate RHS of ODEs
 struct ODEParams {
+    double Omega_r;
     double Omega_m;
+    double Omega_DE;
     double H0;
     double w0;
     double wa;
@@ -56,7 +58,10 @@ struct ODEParams {
  */
 inline int ode_system(double t, const double y[], double dydt[], void *params) {
     ODEParams *p = static_cast<ODEParams *>(params);
-    double Omega_m = p->Omega_m;
+    double Omega_r  = p->Omega_r;
+    double Omega_m  = p->Omega_m;
+    double Omega_DE = p->Omega_DE;
+    
     double w0 = p->w0;
     double wa = p->wa;
     double H0 = p->H0;
@@ -72,7 +77,7 @@ inline int ode_system(double t, const double y[], double dydt[], void *params) {
     double Fbprime = y[8];
     // double Fc = y[9];
 
-    double H_of_a = H0 * std::sqrt(Omega_m / (a * a * a) + (1 - Omega_m) * std::pow(a, -3 * (1 + w0 + wa)) * std::exp(-3 * wa * (1 - a)));
+    double H_of_a = H0 * std::sqrt(Omega_r / (a*a*a*a) + Omega_m / (a * a * a) + Omega_DE * std::pow(a, -3 * (1 + w0 + wa)) * std::exp(-3 * wa * (1 - a)));
 
     dydt[0] = a * a * H_of_a;
     dydt[1] = Dprime;
@@ -160,6 +165,8 @@ private:
     {
         // using v_t = vec_t<10, double>;
         double Omega_m = cosmo_param_["Omega_m"];
+        double Omega_r = cosmo_param_["Omega_r"];
+        double Omega_DE = cosmo_param_["Omega_DE"];
         double H0 = cosmo_param_["H0"];
         double w0 = cosmo_param_["w_0"];
         double wa = cosmo_param_["w_a"];
@@ -197,7 +204,7 @@ private:
         gsl_odeiv2_evolve * e = gsl_odeiv2_evolve_alloc (10);
         // gsl_odeiv2_driver *d = gsl_odeiv2_driver_alloc_y_new(&sys, T, 1e-6, 0.0, 0.0);
 
-        ODEParams params = {Omega_m, H0, w0, wa};
+        ODEParams params = {Omega_r, Omega_m, Omega_DE, H0, w0, wa};
         gsl_odeiv2_system sys = {ode_system, nullptr, 10, &params};
 
         double h = 1e-6;
@@ -490,20 +497,10 @@ public:
         return f_of_a_(a);
     }
 
+    //! Computes the time derivative w.r.t. conformal time of the linear growth factor D+
     real_t get_dotD(real_t a) const noexcept
     {
-        return dotD_of_a_(a);
-    }
-
-    //! Compute the factor relating particle displacement and velocity
-    /*! Function computes
-        *  vfac = a * (H(a)/h) * dlogD+ / dlog a
-        */
-    real_t get_vfact(real_t a) const noexcept
-    {
-
-        music::ilog << a << " --> " << a * H_of_a(a) / cosmo_param_["h"] << std::endl;
-        return f_of_a_(a) * a * H_of_a(a) / cosmo_param_["h"];
+        return dotD_of_a_(a) / Dnow_;
     }
 
     // toma
@@ -515,12 +512,11 @@ public:
     }
 
     // toma
-    //! Computes the time derivative w.r.t. conformal time of the
-    //! second-order growth factor E
+    //! Computes the time derivative w.r.t. conformal time of the second-order growth factor E
     //! see definition in 2205.11347 (eq. 28) (or 1602.05933 eq. 2.21)
     real_t get_dotE(real_t a) const noexcept
     {
-        return dotE_of_a_(a) / Dnow_ / Dnow_ / cosmo_param_["h"];;
+        return dotE_of_a_(a) / Dnow_ / Dnow_ ;
     }
 
     //! Computes the third-order growth factor Fa,
@@ -544,28 +540,58 @@ public:
         return Fc_of_a_(a) / Dnow_ / Dnow_ / Dnow_;
     }
 
-    //! Computes the conformal time derivative of the
-    //! third-order growth factor Fa,
+    //! Computes the conformal time derivative of the third-order growth factor Fa,
     //! see definition in 2205.11347
     real_t get_dotFa(real_t a) const noexcept
     {
-        return dotFa_of_a_(a) / Dnow_ / Dnow_ / Dnow_ / cosmo_param_["h"];;
+        return dotFa_of_a_(a) / Dnow_ / Dnow_ / Dnow_;
     }
 
-    //! computes the conformal time derivative of the
-    //! third-order growth factor Fb,
+    //! computes the conformal time derivative of the third-order growth factor Fb,
     //! see definition in 2205.11347
     real_t get_dotFb(real_t a) const noexcept
     {
-        return dotFb_of_a_(a) / Dnow_ / Dnow_ / Dnow_ / cosmo_param_["h"];;
+        return dotFb_of_a_(a) / Dnow_ / Dnow_ / Dnow_ ;
     }
 
-    //! computes the conformal time derivative of the
-    //! third-order growth factor Fc,
+    //! computes the conformal time derivative of the third-order growth factor Fc,
     //! see definition in 2205.11347
     real_t get_dotFc(real_t a) const noexcept
     {
-        return dotFc_of_a_(a) / Dnow_ / Dnow_ / Dnow_ / cosmo_param_["h"];;
+        return dotFc_of_a_(a) / Dnow_ / Dnow_ / Dnow_;
+    }
+
+    //! Compute the factor relating particle displacement and velocity
+    /*! Function computes
+        *  vfac = a * (H(a)/h) * dlogD+ / dlog a
+        */
+    real_t get_vfacD(real_t a) const noexcept
+    {
+        return get_dotD(a) /  get_growth_factor(a) / cosmo_param_["h"];
+    }
+
+    //! Compute the factor relating second-order particle displacement and velocity
+    real_t get_vfacE(real_t a) const noexcept
+    {
+        return get_dotE(a) /  get_2growth_factor(a) / cosmo_param_["h"];
+    }
+
+    //! Compute the factor relating third-order (a) particle displacement and velocity
+    real_t get_vfacFa(real_t a) const noexcept
+    {
+        return get_dotFa(a) /  get_3growthA_factor(a) / cosmo_param_["h"];
+    }
+
+    //! Compute the factor relating third-order (b) particle displacement and velocity
+    real_t get_vfacFb(real_t a) const noexcept
+    {
+        return get_dotFb(a) /  get_3growthB_factor(a) / cosmo_param_["h"];
+    }
+
+    //! Compute the factor relating third-order (c) particle displacement and velocity
+    real_t get_vfacFc(real_t a) const noexcept
+    {
+        return get_dotFc(a) /  get_3growthC_factor(a) / cosmo_param_["h"];
     }
 
     //! Integrand for the sigma_8 normalization of the power spectrum
@@ -604,7 +630,8 @@ public:
 
     //! Computes the amplitude of a mode from the power spectrum
     /*! Function evaluates the supplied transfer function transfer_function_
-	 * and returns the amplitude of fluctuations at wave number k (in h/Mpc) back-scaled to z=z_start
+	 * and returns the amplitude of fluctuations (norm * T(k) * sqrt(k^n_s)) at wave 
+     * number k (in h/Mpc) back-scaled to z=z_start
 	 * @param k wave number at which to evaluate
      * @param type one of the species: {delta,theta}_{matter,cdm,baryon,neutrino}
 	 */
@@ -613,6 +640,13 @@ public:
         return std::pow(k, 0.5 * m_n_s_) * transfer_function_->compute(k, type) * m_sqrtpnorm_;
     }
 
+    //! Computes the normalised transfer function T(k)
+    /*! Function evaluates the supplied transfer function transfer_function_
+        * and returns the transfer function (-norm * T(k) * k^2) at wave number k 
+        * (in h/Mpc) back-scaled to z=z_start
+        * @param k wave number at which to evaluate
+        * @param type one of the species: {delta,theta}_{matter,cdm,baryon,neutrino}
+     */
     inline real_t get_transfer( const real_t k, const tf_type type) const
     {
         return -transfer_function_->compute(k, type)*k*k / tnorm_ * m_sqrtpnorm_;
@@ -648,11 +682,11 @@ public:
         kmax = transfer_function_->get_kmax();
         kmin = transfer_function_->get_kmin();
 
-        if (!transfer_function_->tf_has_total0())
-            sigma0 = 4.0 * M_PI * integrate(&dSigma8, static_cast<double>(kmin), static_cast<double>(kmax), this);
-        else{
-            sigma0 = 4.0 * M_PI * integrate(&dSigma8_0, static_cast<double>(kmin), static_cast<double>(kmax), this);
-        }
+        // if (!transfer_function_->tf_has_total0())
+        sigma0 = 4.0 * M_PI * integrate(&dSigma8, static_cast<double>(kmin), static_cast<double>(kmax), this);
+        // else{
+        //     sigma0 = 4.0 * M_PI * integrate(&dSigma8_0, static_cast<double>(kmin), static_cast<double>(kmax), this);
+        // }
 
         return std::sqrt(sigma0);
     }

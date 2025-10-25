@@ -98,6 +98,10 @@ public:
         if (plan_ != nullptr)  { FFTW_API(destroy_plan)(plan_); plan_ = nullptr; }
         if (iplan_ != nullptr) { FFTW_API(destroy_plan)(iplan_); iplan_ = nullptr; }
         ballocated_ = false;
+        sizes_ = {0, 0, 0, 0};
+        n_ = {0, 0, 0};
+        nhalf_ = {0, 0, 0};
+        ntot_ = 0;
     }
 
     /// @brief return the grid object for a given refinement level [dummy implementation for backward compatibility with MUSIC1]

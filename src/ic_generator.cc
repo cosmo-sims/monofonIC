@@ -219,32 +219,25 @@ int run( config_file& the_config )
     // Compute LPT time coefficients
     //--------------------------------------------------------------------
     const real_t Dplus0 = the_cosmo_calc->get_growth_factor(astart);
+    const real_t E0     = the_cosmo_calc->get_2growth_factor(astart);
+    const real_t Fa0    = the_cosmo_calc->get_3growthA_factor(astart);
+    const real_t Fb0    = the_cosmo_calc->get_3growthB_factor(astart);
+    const real_t Fc0    = the_cosmo_calc->get_3growthC_factor(astart);
 
-    const real_t E0 = the_cosmo_calc->get_2growth_factor(astart);
-    const real_t Fa0 = the_cosmo_calc->get_3growthA_factor(astart);
-    const real_t Fb0 = the_cosmo_calc->get_3growthB_factor(astart);
-    const real_t Fc0 = the_cosmo_calc->get_3growthC_factor(astart);
-
-    const real_t vfac   = the_cosmo_calc->get_vfact(astart);
-
-    const real_t g1  = -Dplus0;
-
-    // const real_t g2  = ((LPTorder>1)? -3.0/7.0*Dplus0*Dplus0 : 0.0);
-    // const real_t g3  = ((LPTorder>2)? 1.0/3.0*Dplus0*Dplus0*Dplus0 : 0.0);
-    // const real_t g3c = ((LPTorder>2)? 1.0/7.0*Dplus0*Dplus0*Dplus0 : 0.0);
-   
+    // set growth factors for all LPT terms that will be used
+    const real_t g1  = Dplus0;
     const real_t g2  = ((LPTorder>1)? E0 : 0.0);
     const real_t g3a = ((LPTorder>2)? Fa0 : 0.0);
-    const real_t g3b = ((LPTorder>2)? Fb0 * 7./10. : 0.0);
+    const real_t g3b = ((LPTorder>2)? Fb0 : 0.0);
     const real_t g3c = ((LPTorder>2)? Fc0: 0.0);
 
-    // vfac = d log D+ / dt 
-    const real_t vfac1  = vfac;
-    const real_t vfac2  = the_cosmo_calc->get_dotE(astart)  / E0 ;
-    const real_t vfac3a = the_cosmo_calc->get_dotFa(astart) / Fa0;
-    const real_t vfac3b = the_cosmo_calc->get_dotFb(astart) / Fb0;
-    const real_t vfac3c = the_cosmo_calc->get_dotFc(astart) / Fc0;
-
+    // displacement to velocity conversion factors vfac = d log D+ / dt / h
+    const real_t vfac1  = the_cosmo_calc->get_vfacD(astart);
+    const real_t vfac2  = the_cosmo_calc->get_vfacE(astart);
+    const real_t vfac3a = the_cosmo_calc->get_vfacFa(astart);
+    const real_t vfac3b = the_cosmo_calc->get_vfacFb(astart);
+    const real_t vfac3c = the_cosmo_calc->get_vfacFc(astart);
+   
     // anisotropic velocity growth factor for external tides
     // cf. eq. (5) of Stuecker et al. 2020 (https://arxiv.org/abs/2003.06427)
     const std::array<real_t,3> lss_aniso_alpha = {
@@ -252,29 +245,6 @@ int run( config_file& the_config )
         real_t(1.0) - Dplus0 * lss_aniso_lambda[1],
         real_t(1.0) - Dplus0 * lss_aniso_lambda[2],
     };
-
-    music::ilog << "LPT growth factors:" << std::endl;
-        music::ilog << "  g1   = " << g1 << std::endl;
-        if( LPTorder > 1 ){
-            music::ilog << "  g2   = " << g2 << " | " << g2/(-3./7*g1*g1) << std::endl;
-        }
-        if( LPTorder > 2 ){
-            music::ilog << "  g3a  = " << g3a << " | " << g3a/(1./3*g1*g1*g1) << std::endl;
-            music::ilog << "  g3b  = " << g3b << " | " << g3b/(1./3*g1*g1*g1) << std::endl;
-            music::ilog << "  g3c  = " << g3c << " | " << g3c/(1./7*g1*g1*g1) << std::endl;
-        }
-        music::ilog << "LPT velocity factors:" << std::endl;
-        music::ilog << "  vfac1  = " << vfac1 << std::endl;
-        if( LPTorder > 1 ){
-            music::ilog << "  vfac2  = " << vfac2 << " | " << vfac2/(2*vfac1) << std::endl;
-        }
-        if( LPTorder > 2 ){
-            music::ilog << "  vfac3a = " << vfac3a << " | " << vfac3a / (3*vfac1) << std::endl;
-            music::ilog << "  vfac3b = " << vfac3b << " | " << vfac3b / (3*vfac1) << std::endl;
-            music::ilog << "  vfac3c = " << vfac3c << " | " << vfac3c / (3*vfac1) << std::endl;
-        }
-
-    music::ilog << "Dnow  = " << the_cosmo_calc->Dnow_ << std::endl;
 
     //--------------------------------------------------------------------
     // Create arrays
@@ -488,7 +458,7 @@ int run( config_file& the_config )
 
         phi.assign_function_of_grids_kdep([&](auto k, auto delta) {
             real_t kmod = k.norm();
-            return - delta * the_cosmo_calc->get_transfer(kmod, delta_matter) / kmod /kmod ;
+            return delta * the_cosmo_calc->get_transfer(kmod, delta_matter) / kmod /kmod ;
         }, phi);
 
     } else {
@@ -496,7 +466,7 @@ int run( config_file& the_config )
             real_t kmod = k.norm();
             ccomplex_t delta = wn * the_cosmo_calc->get_amplitude(kmod, delta_matter);
 
-            return -delta / (kmod * kmod);
+            return delta / (kmod * kmod);
         }, wnoise);
     }
     phi.zero_DC_mode();
@@ -545,14 +515,16 @@ int run( config_file& the_config )
     //======================================================================
     if (LPTorder > 2)
     {
-        phi3a.allocate();
-        phi3a.FourierTransformForward(false);
+        
 
         
         //... phi3 = phi3a - 10/7 phi3b
         //... 3a term ...
-        wtime = get_wtime();
         music::ilog << std::setw(79) << std::setfill('.') << std::left << ">> Computing phi(3a) term" << std::endl;
+        
+        wtime = get_wtime();
+        phi3a.allocate();
+        phi3a.FourierTransformForward(false);
         Conv.convolve_Hessians(phi, {0, 0}, phi, {1, 1}, phi, {2, 2}, op::assign_to(phi3a));
         Conv.convolve_Hessians(phi, {0, 1}, phi, {0, 2}, phi, {1, 2}, op::multiply_add_to(phi3a,2.0));
         Conv.convolve_Hessians(phi, {1, 2}, phi, {1, 2}, phi, {0, 0}, op::subtract_from(phi3a));
@@ -562,23 +534,24 @@ int run( config_file& the_config )
         music::ilog << std::setw(70) << std::setfill(' ') << std::right << "took : " << std::setw(8) << get_wtime() - wtime << "s" << std::endl;
 
         //... 3b term ...
-        phi3b.allocate();
-        phi3b.FourierTransformForward(false);
-        phi3b.zero();
-        wtime = get_wtime();
         music::ilog << std::setw(71) << std::setfill('.') << std::left << ">> Computing phi(3b) term" << std::endl;
-        Conv.convolve_SumOfHessians(phi, {0, 0}, phi2, {1, 1}, {2, 2}, op::multiply_add_to(phi3b,-5.0/7.0));
-        Conv.convolve_SumOfHessians(phi, {1, 1}, phi2, {2, 2}, {0, 0}, op::multiply_add_to(phi3b,-5.0/7.0));
-        Conv.convolve_SumOfHessians(phi, {2, 2}, phi2, {0, 0}, {1, 1}, op::multiply_add_to(phi3b,-5.0/7.0));
-        Conv.convolve_Hessians(phi, {0, 1}, phi2, {0, 1}, op::multiply_add_to(phi3b,+10.0/7.0));
-        Conv.convolve_Hessians(phi, {0, 2}, phi2, {0, 2}, op::multiply_add_to(phi3b,+10.0/7.0));
-        Conv.convolve_Hessians(phi, {1, 2}, phi2, {1, 2}, op::multiply_add_to(phi3b,+10.0/7.0));
+        
+        wtime = get_wtime();
+        phi3b.allocate();
+        phi3b.zero();
+        phi3b.FourierTransformForward(false);
+        Conv.convolve_SumOfHessians(phi, {0, 0}, phi2, {1, 1}, {2, 2}, op::multiply_add_to(phi3b,0.5));
+        Conv.convolve_SumOfHessians(phi, {1, 1}, phi2, {2, 2}, {0, 0}, op::multiply_add_to(phi3b,0.5));
+        Conv.convolve_SumOfHessians(phi, {2, 2}, phi2, {0, 0}, {1, 1}, op::multiply_add_to(phi3b,0.5));
+        Conv.convolve_Hessians(phi, {0, 1}, phi2, {0, 1}, op::multiply_add_to(phi3b, -1.0));
+        Conv.convolve_Hessians(phi, {0, 2}, phi2, {0, 2}, op::multiply_add_to(phi3b, -1.0));
+        Conv.convolve_Hessians(phi, {1, 2}, phi2, {1, 2}, op::multiply_add_to(phi3b, -1.0));
         phi3b.apply_InverseLaplacian();
         music::ilog << std::setw(70) << std::setfill(' ') << std::right << "took : " << std::setw(8) << get_wtime() - wtime << "s" << std::endl;
 
-        //... transversal term ...
-        wtime = get_wtime();
+        //... transversal term 3c...
         music::ilog << std::setw(71) << std::setfill('.') << std::left << ">> Computing A(3) term" << std::endl;
+        wtime = get_wtime();
         for (int idim = 0; idim < 3; ++idim)
         {
             // cyclic rotations of indices
@@ -600,15 +573,15 @@ int run( config_file& the_config )
     if (LPTorder > 1)
     {
         phi2 *= g2;
-    }
     
-    if (LPTorder > 2)
-    {
-        phi3a *= g3a;
-        phi3b *= g3b;
-        (*A3[0]) *= g3c;
-        (*A3[1]) *= g3c;
-        (*A3[2]) *= g3c;
+        if (LPTorder > 2)
+        {
+            phi3a *= g3a;
+            phi3b *= g3b;
+            (*A3[0]) *= g3c;
+            (*A3[1]) *= g3c;
+            (*A3[2]) *= g3c;
+        }
     }
 
     music::ilog << "-------------------------------------------------------------------------------" << std::endl;
@@ -806,7 +779,7 @@ int run( config_file& the_config )
                 // compute  v
                 //======================================================================
                 Grid_FFT<ccomplex_t> grad_psi({ngrid, ngrid, ngrid}, {boxlen, boxlen, boxlen});
-                const real_t vunit = Dplus0 * vfac / boxlen * the_output_plugin->velocity_unit();
+                const real_t vunit = Dplus0 * vfac1 / boxlen * the_output_plugin->velocity_unit();
                 for( int idim=0; idim<3; ++idim )
                 {
                     grad_psi.FourierTransformBackward(false);
