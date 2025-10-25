@@ -305,6 +305,8 @@ target_link_libraries(${PRGNAME} PRIVATE GSL::gsl)
 option(ENABLE_CLASS "Enable CLASS support (as a submodule)." ON)
 
 if(ENABLE_CLASS)
+  # Store monofonIC source directory for CLASS version script
+  set(MONOFONIC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE INTERNAL "")
   include(${CMAKE_CURRENT_SOURCE_DIR}/external/class.cmake)
   target_link_libraries(${PRGNAME} PRIVATE class::libclass)
   target_compile_definitions(${PRGNAME} PRIVATE "USE_CLASS")

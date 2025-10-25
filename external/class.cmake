@@ -10,9 +10,6 @@ FetchContent_Declare(
     PATCH_COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/external/CLASS_CMakeLists.txt
         <SOURCE_DIR>/CMakeLists.txt
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/external/class_version.cmake
-        <SOURCE_DIR>/class_version.cmake
 )
 
 set(FETCHCONTENT_QUIET OFF)
