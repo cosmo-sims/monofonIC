@@ -25,7 +25,7 @@ Currently supported features (the list is growing, so check back):
 
 - Hybrid parallelization with MPI+OpenMP/threads.
     
-- Requires FFTW v3, GSL (and HDF5 for output for some codes), as well as a CMake build system and a reasonably new C++14 compliant compiler.
+- Requires FFTW v3, GSL (and HDF5 for output for some codes), as well as a CMake build system and a reasonably new C++17 compliant compiler.
 
 New modules/plugins can be easily added (see how to contribute in CONTRIBUTING.md file)
 
