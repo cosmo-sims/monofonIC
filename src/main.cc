@@ -63,6 +63,37 @@ void handle_eptr(std::exception_ptr eptr) // passing by value is ok
     }
 }
 
+void print_compile_time_info() {
+    // Ascii ART logo. generated via http://patorjk.com/software/taag/#p=display&f=Nancyj&t=monofonIC
+    music::ilog << "\n" << colors::LOGO
+                << " The unigrid version of MUSIC-2         .8888b                   dP  a88888b. \n"
+                << "                                        88   \"                   88 d8\'   `88 \n"
+                << "  88d8b.d8b. .d8888b. 88d888b. .d8888b. 88aaa  .d8888b. 88d888b. 88 88        \n"
+                << "  88\'`88\'`88 88\'  `88 88\'  `88 88\'  `88 88     88\'  `88 88\'  `88 88 88        \n"
+                << "  88  88  88 88.  .88 88    88 88.  .88 88     88.  .88 88    88 88 Y8.   .88 \n"
+                << "  dP  dP  dP `88888P\' dP    dP `88888P\' dP     `88888P\' dP    dP dP  Y88888P\' \n" << colors::RESET << std::endl;
+
+    // git and versioning info:
+    music::ilog << "Version: git rev.: " << GIT_REV << ", tag: " << GIT_TAG << ", branch: " << GIT_BRANCH << std::endl;
+
+    // Compilation CMake configuration, time etc info:
+    music::ilog << "This " << CMAKE_BUILDTYPE_STR << " build was compiled at " << __TIME__ << " on " <<  __DATE__ << std::endl;
+
+#ifdef __GNUC__
+    music::ilog << "Compiled with GNU C++ version " << __VERSION__ <<std::endl;
+#else
+    music::ilog << "Compiled with " << __VERSION__ << std::endl;
+#endif
+
+
+    music::ilog << music::HRULE << std::endl;
+    music::ilog << "Compile time options : " << std::endl;
+    music::ilog << "                       Precision : " << colors::CONFIG_VALUE << CMAKE_PRECISION_STR << colors::RESET << std::endl;
+    music::ilog << "                    Convolutions : " << colors::CONFIG_VALUE << CMAKE_CONVOLVER_STR << colors::RESET << std::endl;
+    music::ilog << "                             PLT : " << colors::CONFIG_VALUE << CMAKE_PLT_STR << colors::RESET << std::endl;
+    music::ilog << music::HRULE << std::endl;
+}
+
 /**
  * @brief the main routine of MUSIC2-monofonIC
  * 
@@ -100,42 +131,13 @@ int main( int argc, char** argv )
     }
 #endif
 
-    // Ascii ART logo. generated via http://patorjk.com/software/taag/#p=display&f=Nancyj&t=monofonIC
-    music::ilog << "\n" << colors::LOGO
-                << " The unigrid version of MUSIC-2         .8888b                   dP  a88888b. \n"
-                << "                                        88   \"                   88 d8\'   `88 \n"
-                << "  88d8b.d8b. .d8888b. 88d888b. .d8888b. 88aaa  .d8888b. 88d888b. 88 88        \n"
-                << "  88\'`88\'`88 88\'  `88 88\'  `88 88\'  `88 88     88\'  `88 88\'  `88 88 88        \n"
-                << "  88  88  88 88.  .88 88    88 88.  .88 88     88.  .88 88    88 88 Y8.   .88 \n"
-                << "  dP  dP  dP `88888P\' dP    dP `88888P\' dP     `88888P\' dP    dP dP  Y88888P\' \n" << colors::RESET << std::endl;
-
-    // git and versioning info:
-    music::ilog << "Version: git rev.: " << GIT_REV << ", tag: " << GIT_TAG << ", branch: " << GIT_BRANCH << std::endl;
-    
-    // Compilation CMake configuration, time etc info:
-    music::ilog << "This " << CMAKE_BUILDTYPE_STR << " build was compiled at " << __TIME__ << " on " <<  __DATE__ << std::endl;
-
-#ifdef __GNUC__
-    music::ilog << "Compiled with GNU C++ version " << __VERSION__ <<std::endl;
-#else
-    music::ilog << "Compiled with " << __VERSION__ << std::endl;
-#endif
-
-    
-    music::ilog << music::HRULE << std::endl;
-    music::ilog << "Compile time options : " << std::endl;
-    music::ilog << "                       Precision : " << colors::CONFIG_VALUE << CMAKE_PRECISION_STR << colors::RESET << std::endl;
-    music::ilog << "                    Convolutions : " << colors::CONFIG_VALUE << CMAKE_CONVOLVER_STR << colors::RESET << std::endl;
-    music::ilog << "                             PLT : " << colors::CONFIG_VALUE << CMAKE_PLT_STR << colors::RESET << std::endl;
-    music::ilog << music::HRULE << std::endl;
-
-
     //------------------------------------------------------------------------------
     // Parse command line options
     //------------------------------------------------------------------------------
 
     if (argc != 2)
     {
+        print_compile_time_info();
         // print_region_generator_plugins();
         cosmology::print_ParameterSets();
         print_TransferFunction_plugins();
@@ -150,6 +152,7 @@ int main( int argc, char** argv )
     config_file the_config(argv[1]);
     std::string log_filename = the_config.get_path_relative_to_config("log.txt");
     music::logger::set_output(log_filename);
+    print_compile_time_info();
     music::ilog << "                         argv[1] : " << argv[1] << std::endl;
     music::ilog << "                 config_basename : " << the_config.get_path_relative_to_config("") << std::endl;
     music::ilog << "                        log file : " << log_filename << std::endl;
