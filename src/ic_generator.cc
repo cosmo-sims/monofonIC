@@ -113,17 +113,21 @@ int run( config_file& the_config )
     const double k0    = the_config.get_value_safe<double>("cosmology","k0",0);
     const double gnl   = the_config.get_value_safe<double>("cosmology","gnl",0);
     const double norm  = the_config.get_value_safe<double>("cosmology","norm",1);
-    #if defined(USE_CONVOLVER_ORSZAG)
+    #if defined(USE_CONVOLVER_ORSZAG) | defined(USE_CONVOLVER_ORSZAG_PNG)
         //! check if grid size is even for Orszag convolver
         if( (ngrid%2 != 0) && (LPTorder>1) ){
             music::elog << "ERROR: Orszag convolver for LPTorder>1 requires even grid size!" << std::endl;
             throw std::runtime_error("Orszag convolver for LPTorder>1 requires even grid size!");
             return 0;
         }
-    #else
+    #elif !defined(USE_CONVOLVER_ORSZAG)
         //! warn if Orszag convolver is not used
         if( LPTorder>1 ){
             music::wlog << "WARNING: LPTorder>1 requires USE_CONVOLVER_ORSZAG to be enabled to avoid aliased results!" << std::endl;
+        }
+    #elif !defined(USE_CONVOLVER_ORSZAG_PNG)
+        if( fnl != 0 || gnl != 0 ){
+            music::wlog << "WARNING: fNL!=0 or gNL!=0 requires USE_CONVOLVER_ORSZAG_PNG to be enabled to avoid aliased results!" << std::endl;
         }
     #endif
 
@@ -369,6 +373,13 @@ int run( config_file& the_config )
 #elif defined(USE_CONVOLVER_NAIVE)
     NaiveConvolver<real_t> Conv({ngrid, ngrid, ngrid}, {boxlen, boxlen, boxlen});
 #endif
+#if defined(USE_CONVOLVER_ORSZAG_PNG)
+    OrszagConvolver<real_t> Conv_png({ngrid, ngrid, ngrid}, {boxlen, boxlen, boxlen});
+#elif defined(USE_CONVOLVER_NAIVE_PNG)
+    NaiveConvolver<real_t> Conv_png({ngrid, ngrid, ngrid}, {boxlen, boxlen, boxlen});
+#endif
+
+
     //--------------------------------------------------------------------
 
     //--------------------------------------------------------------------
@@ -411,7 +422,7 @@ int run( config_file& the_config )
         delta_power.allocate(); 
         delta_power.FourierTransformForward(false);
 
-        Conv.multiply_field(phi, phi , op::assign_to(delta_power)); // phi2 = zeta^2
+        Conv_png.multiply_field(phi, phi , op::assign_to(delta_power)); // phi2 = zeta^2
 
         if (nf != 0)
         {
@@ -423,12 +434,13 @@ int run( config_file& the_config )
  
         delta_power.FourierTransformBackward();
         phi.FourierTransformBackward();
+        real_t var_phi = delta_power.mean();  // = <phi^2>
         if (fnl != 0)
         {
             music::ilog << "\n>>> Computing  fnl term.... <<<\n" << std::endl;
 
             phi.assign_function_of_grids_r([&](auto delta1, auto delta_power ){
-                     return norm*(delta1 -fnl*delta_power*3.0/5.0) ;}, phi, delta_power);
+                     return norm*(delta1 - fnl*(delta_power - var_phi)*3.0/5.0) ;}, phi, delta_power);
                     // return norm*(delta1 - fnl*delta_power) ;}, phi, delta_power);
                     // the -3/5 factor is to match the usual fnl  in terms of phi
                     // 3/5 fnl_zeta = fnl_phi
@@ -439,13 +451,14 @@ int run( config_file& the_config )
 
             music::ilog << "\n>>> Computing  gnl term.... <<<\n" << std::endl;
             
-            Conv.multiply_field(delta_power, phi , op::assign_to(delta_power)); // delta3 = delta^3
+            Conv_png.multiply_field(delta_power, phi , op::assign_to(delta_power)); // delta3 = delta^3
 
             delta_power.FourierTransformBackward();
+
             phi.FourierTransformBackward();
 
             phi.assign_function_of_grids_r([&](auto delta1, auto delta_power ){
-                     return norm*(delta1 - gnl*delta_power*9.0/25.0) ;}, phi, delta_power);  
+                     return norm*(delta1 - gnl*(delta_power - 3*var_phi*delta1)*9.0/25.0) ;}, phi, delta_power);  
                       // the -9/25 factor is to match the usual gnl  in terms of phi
                       // 9/25 gnl_zeta = gnl_phi  
         }

@@ -222,40 +222,62 @@ public:
         if (CONFIG::MPI_task_rank == 0)
         {
             double kmin = std::max(1e-4, transfer_function_->get_kmin());
+            double fb = cosmo_param_["f_b"], fc = cosmo_param_["f_c"];
 
             // write power spectrum to a file
             std::ofstream ofs(fname.c_str());
-            std::stringstream ss;
-            ss << " ,ap=" << a << "";
+            // std::stringstream ss;
+            // ss << " ,ap=" << a << "";
+            ofs << "# astart  = " << a << std::endl;
+            ofs << "# atarget = " << atarget_ << std::endl;
+            ofs << "# D+start = " << this->get_growth_factor(a) << std::endl;
             ofs << "# " << std::setw(18) << "k [h/Mpc]"
-                << std::setw(20) << ("P_dtot(k,a=ap)")
-                << std::setw(20) << ("P_dcdm(k,a=ap)")
-                << std::setw(20) << ("P_dbar(k,a=ap)")
-                << std::setw(20) << ("P_tcdm(k,a=ap)")
-                << std::setw(20) << ("P_tbar(k,a=ap)")
-                << std::setw(20) << ("P_dtot(k,a=1)")
-                << std::setw(20) << ("P_dcdm(k,a=1)")
-                << std::setw(20) << ("P_dbar(k,a=1)")
-                << std::setw(20) << ("P_tcdm(k,a=1)")
-                << std::setw(20) << ("P_tbar(k,a=1)")
+                << std::setw(20) << ("P_deltam")
+                << std::setw(20) << ("P_deltac")
+                << std::setw(20) << ("P_deltab")
+                // << std::setw(20) << ("P_deltabc")
+                // << std::setw(20) << ("P_thetam")
+                // << std::setw(20) << ("P_thetac")
+                // << std::setw(20) << ("P_thetab")
+                // << std::setw(20) << ("P_thetabc")
                 << std::endl;
+
             for (double k = kmin; k < transfer_function_->get_kmax(); k *= 1.01)
             {
+                const double dm  = this->get_amplitude(k, delta_matter) * Dplus_start_; // / Dplus_target_;
+                const double dbc = this->get_amplitude(k, delta_bc);
+                const double db  = dm + fc * dbc;
+                const double dc  = dm - fb * dbc;
+                // const double tm  = this->get_amplitude(k, theta_matter) * Dplus_start_; // / Dplus_target_;
+                // const double tbc = this->get_amplitude(k, theta_bc);
+                // const double tb  = dm + fc * dbc;
+                // const double tc  = dm - fb * dbc;
+                
                 ofs << std::setw(20) << std::setprecision(10) << k
-                    << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_matter)*Dplus_start_, 2.0)
-                    << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_cdm)*Dplus_start_, 2.0)
-                    << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_baryon)*Dplus_start_, 2.0)
-                    // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_matter)*Dplus_start_, 2.0)
-                    // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_cdm)*Dplus_start_, 2.0)
-                    // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_baryon)*Dplus_start_, 2.0)
-                    // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, theta_cdm)*Dplus_start_, 2.0)
-                    // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, theta_baryon)*Dplus_start_, 2.0)
-                    // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_matter0)* Dplus_start_ / Dplus_target_, 2.0)
-                    // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_cdm0)* Dplus_start_ / Dplus_target_, 2.0)
-                    // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_baryon0)* Dplus_start_ / Dplus_target_, 2.0)
-                    // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, theta_cdm0)* Dplus_start_ / Dplus_target_, 2.0)
-                    // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, theta_baryon0)* Dplus_start_ / Dplus_target_, 2.0)
+                    << std::setw(20) << std::setprecision(10) << std::pow(dm,2)
+                    << std::setw(20) << std::setprecision(10) << std::pow(dc,2)
+                    << std::setw(20) << std::setprecision(10) << std::pow(db,2)
+                    // << std::setw(20) << std::setprecision(10) << std::pow(dbc + 2 * tbc * (std::sqrt( Dplus_target_ / Dplus_start_ ) - 1.0),2)
+                    // << std::setw(20) << std::setprecision(10) << std::pow(tm / std::pow( Dplus_start_ / Dplus_target_, 0.5 ),2)
+                    // << std::setw(20) << std::setprecision(10) << std::pow(tc / std::pow( Dplus_start_ / Dplus_target_, 0.5 ),2)
+                    // << std::setw(20) << std::setprecision(10) << std::pow(tb / std::pow( Dplus_start_ / Dplus_target_, 0.5 ),2)
+                    // << std::setw(20) << std::setprecision(10) << std::pow(tbc / std::pow( Dplus_start_ / Dplus_target_, 0.5 ),2)
                     << std::endl;
+                // ofs << std::setw(20) << std::setprecision(10) << k
+                //     << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_matter)*Dplus_start_, 2.0)
+                //     << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_cdm)*Dplus_start_, 2.0)
+                //     << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_baryon)*Dplus_start_, 2.0)
+                //     // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_matter)*Dplus_start_, 2.0)
+                //     // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_cdm)*Dplus_start_, 2.0)
+                //     // << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_baryon)*Dplus_start_, 2.0)
+                //     << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, theta_cdm)*Dplus_start_, 2.0)
+                //     << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, theta_baryon)*Dplus_start_, 2.0)
+                //     << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_matter0)* Dplus_start_ / Dplus_target_, 2.0)
+                //     << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_cdm0)* Dplus_start_ / Dplus_target_, 2.0)
+                //     << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, delta_baryon0)* Dplus_start_ / Dplus_target_, 2.0)
+                //     << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, theta_cdm0)* Dplus_start_ / Dplus_target_, 2.0)
+                //     << std::setw(20) << std::setprecision(10) << std::pow(this->get_amplitude(k, theta_baryon0)* Dplus_start_ / Dplus_target_, 2.0)
+                //     << std::endl;
             }
         }
         music::ilog << "Wrote power spectrum at a=" << a << " to file \'" << fname << "\'" << std::endl;

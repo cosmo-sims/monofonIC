@@ -125,7 +125,8 @@ int main( int argc, char** argv )
     music::ilog << "-------------------------------------------------------------------------------" << std::endl;
     music::ilog << "Compile time options : " << std::endl;
     music::ilog << "                       Precision : " << CMAKE_PRECISION_STR << std::endl;
-    music::ilog << "                    Convolutions : " << CMAKE_CONVOLVER_STR << std::endl;
+    music::ilog << "               Convolutions (LPT): " << CMAKE_CONVOLVER_STR << std::endl;
+    music::ilog << "               Convolutions (PNG): " << CMAKE_CONVOLVER_PNG_STR << std::endl;
     music::ilog << "                             PLT : " << CMAKE_PLT_STR << std::endl;
     music::ilog << "-------------------------------------------------------------------------------" << std::endl;
 

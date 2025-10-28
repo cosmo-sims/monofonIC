@@ -20,6 +20,13 @@ constexpr char CMAKE_BUILDTYPE_STR[] = "${CMAKE_BUILD_TYPE}";
   constexpr char CMAKE_CONVOLVER_STR[] = "Aliased";
 #endif
 
+#define USE_CONVOLVER_${CONVOLVER_TYPE_PNG}_PNG
+#if defined(USE_CONVOLVER_ORSZAG_PNG)
+  constexpr char CMAKE_CONVOLVER_PNG_STR[] = "Orszag3/2";
+#elif defined(USE_CONVOLVER_NAIVE_PNG)
+  constexpr char CMAKE_CONVOLVER_PNG_STR[] = "Aliased";
+#endif
+
 #if defined(ENABLE_PLT)
   constexpr char CMAKE_PLT_STR[] = "PLT corr. on";
 #else

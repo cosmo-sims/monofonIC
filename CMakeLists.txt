@@ -99,10 +99,19 @@ set_property (
 # convolver type, right now only orszag or naive
 set (
   CONVOLVER_TYPE "ORSZAG"
-  CACHE STRING "Convolution algorithm to be used (Naive=no dealiasing, Orszag=dealiased)"
+  CACHE STRING "Convolution algorithm to be used for LPT terms (Naive=no dealiasing, Orszag=dealiased)"
 )
 set_property (
   CACHE CONVOLVER_TYPE
+  PROPERTY STRINGS ORSZAG NAIVE
+)
+
+set (
+  CONVOLVER_TYPE_PNG "ORSZAG"
+  CACHE STRING "Convolution algorithm to be used for PNG terms (Naive=no dealiasing, Orszag=dealiased)"
+)
+set_property (
+  CACHE CONVOLVER_TYPE_PNG
   PROPERTY STRINGS ORSZAG NAIVE
 )
 
