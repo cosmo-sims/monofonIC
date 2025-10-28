@@ -21,6 +21,7 @@
 #include <fstream>
 #include <thread>
 #include <cfenv>
+#include <cstdlib>
 
 #if defined(_OPENMP)
 #include <omp.h>
@@ -175,8 +176,31 @@ int main( int argc, char** argv )
     FFTW_API(mpi_init)();
 #endif
 
+    // Save original OMP_NUM_THREADS environment variable if set
+    const char* omp_num_threads_env = std::getenv("OMP_NUM_THREADS");
+    std::string original_omp_num_threads;
+    bool omp_num_threads_was_set = false;
+    if (omp_num_threads_env != nullptr) {
+        original_omp_num_threads = omp_num_threads_env;
+        omp_num_threads_was_set = true;
+    }
+
     CONFIG::num_threads = the_config.get_value_safe<unsigned>("execution", "NumThreads",std::thread::hardware_concurrency());
-    
+
+    // Check if OMP_NUM_THREADS was set and differs from config value
+    if (omp_num_threads_was_set) {
+        int env_num_threads = std::atoi(original_omp_num_threads.c_str());
+        if (env_num_threads > 0 && env_num_threads != CONFIG::num_threads) {
+            music::wlog << "OMP_NUM_THREADS environment variable (" << env_num_threads
+                       << ") differs from config value (" << CONFIG::num_threads
+                       << "). Using config value." << std::endl;
+        }
+    }
+
+    // Set OMP_NUM_THREADS to config value
+    std::string num_threads_str = std::to_string(CONFIG::num_threads);
+    setenv("OMP_NUM_THREADS", num_threads_str.c_str(), 1);
+
 #if defined(USE_FFTW_THREADS)
     if (CONFIG::FFTW_threads_ok)
         FFTW_API(plan_with_nthreads)(CONFIG::num_threads);
@@ -256,7 +280,15 @@ int main( int argc, char** argv )
     }catch(...){
         handle_eptr( std::current_exception() );
         music::elog << "Problem during initialisation. See error(s) above. Exiting..." << std::endl;
-        #if defined(USE_MPI) 
+
+        // Restore original OMP_NUM_THREADS before exiting
+        if (omp_num_threads_was_set) {
+            setenv("OMP_NUM_THREADS", original_omp_num_threads.c_str(), 1);
+        } else {
+            unsetenv("OMP_NUM_THREADS");
+        }
+
+        #if defined(USE_MPI)
         MPI_Finalize();
         #endif
         return 1;
@@ -297,6 +329,13 @@ int main( int argc, char** argv )
 #endif
 
     music::ilog << colors::SUCCESS << "Done. Have a nice day!" << colors::RESET << "\n" << std::endl;
+
+    // Restore original OMP_NUM_THREADS environment variable if it was set
+    if (omp_num_threads_was_set) {
+        setenv("OMP_NUM_THREADS", original_omp_num_threads.c_str(), 1);
+    } else {
+        unsetenv("OMP_NUM_THREADS");
+    }
 
     return 0;
 }
