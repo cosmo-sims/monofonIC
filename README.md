@@ -31,7 +31,7 @@ New modules/plugins can be easily added (see how to contribute in CONTRIBUTING.m
 
 ## Contributors
 - HACC file format plugin: Michael Buehlmann
-- primordial non-Gaussianity support: Thomas Montandon, Adrian Gutierrez
+- primordial non-Gaussianity support: Thomas Montandon, Adrian Gutierrez Adame
 - PANPHASIA2 module: Adrian Jenkins
 
 ## Contributing and Licensing
