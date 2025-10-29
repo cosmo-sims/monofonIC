@@ -31,6 +31,7 @@ New modules/plugins can be easily added (see how to contribute in CONTRIBUTING.m
 
 ## Contributors
 - HACC file format plugin: Michael Buehlmann
+- SWIFT file format plugin: Matthieu Schaller
 - primordial non-Gaussianity support: Thomas Montandon, Adrian Gutierrez Adame
 - PANPHASIA2 module: Adrian Jenkins
 
