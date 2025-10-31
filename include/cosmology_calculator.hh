@@ -430,6 +430,10 @@ public:
                 << std::setw(20) << ("delta_b(k,a=ap)")
                 << std::setw(20) << ("delta_m(k,a=ap)")
                 << std::setw(20) << ("delta_bc(k,a=ap)")
+                << std::setw(20) << ("theta_c(k,a=ap)")
+                << std::setw(20) << ("theta_b(k,a=ap)")
+                << std::setw(20) << ("theta_m(k,a=ap)")
+                << std::setw(20) << ("theta_bc(k,a=ap)")
                 << std::endl;
             double fb = cosmo_param_["f_b"], fc = cosmo_param_["f_c"];
             for (double k = kmin; k < transfer_function_->get_kmax(); k *= 1.01)

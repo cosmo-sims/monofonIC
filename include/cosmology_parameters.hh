@@ -32,6 +32,14 @@
 
 namespace cosmology
 {
+
+    //! type for what the "total matter" component is  
+    enum total_type_t {
+        TOTAL_,
+        MATTER_,
+        BPLUSC_
+    };
+
     //! structure for cosmological parameters
     class parameters
     {
@@ -43,6 +51,7 @@ namespace cosmology
         std::map<std::string, double> pmap_;  //!< All parameters are stored here as key-value pairs
 
         static defaultmmap_t default_pmaps_;  //!< Holds pre-defined parameter sets, see src/cosmology_parameters.cc 
+        cosmology::total_type_t total_type_ = TOTAL_;      //!< what the "total matter" component is
 
     public:
         //! get routine for cosmological parameter key-value pairs
@@ -76,6 +85,11 @@ namespace cosmology
 
         //! shortcut get routine for cosmological parameter key-value pairs through bracket operator
         inline double operator[](const std::string &key) const { return this->get(key); }
+
+        //! get routine for what the "total matter" component is
+        cosmology::total_type_t get_total_type() const noexcept {
+            return total_type_;
+        }
 
         //! default constructor does nothing
         parameters() {}
@@ -265,6 +279,25 @@ namespace cosmology
             {
                 music::wlog << " Radiation enabled, using Omega_r=" << this->get("Omega_r") << " internally for backscaling." << std::endl;
                 music::wlog << " Make sure your sim code supports this, otherwise set [cosmology] / ZeroRadiation=true." << std::endl;
+            }
+
+            //--------------------------------------------------------------------------------
+            // other parameters
+            //--------------------------------------------------------------------------------
+
+            auto tfstring = cf.get_value_safe<std::string>("cosmology","TransferComponent","total");
+            // Convert to lowercase for case-insensitive comparison
+            std::transform(tfstring.begin(), tfstring.end(), tfstring.begin(), ::tolower);
+            
+            if( tfstring == "total" ){
+                total_type_ = TOTAL_;
+            }else if( tfstring == "matter" ){
+                total_type_ = MATTER_;
+            }else if( tfstring == "baryonpluscdm" ){
+                total_type_ = BPLUSC_;
+            }else{
+                music::elog << "Unknown value for [cosmology] / TransferComponent: \'" << tfstring << "\'!" << std::endl;
+                throw std::runtime_error("Invalid value for cosmology/TransferComponent");
             }
         }
 

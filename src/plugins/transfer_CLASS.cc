@@ -63,6 +63,7 @@ protected:
 
     ClassParams pars_;
     bool class_dofree_;
+    cosmology::total_type_t total_type_;
 
 private:
   
@@ -71,7 +72,6 @@ private:
   interpolated_function_1d<true, true, false> delta_c_, delta_b_, delta_n_, delta_m_, theta_c_, theta_b_, theta_n_, theta_m_;
   interpolated_function_1d<true, true, false> delta_c0_, delta_b0_, delta_n0_, delta_m0_, theta_c0_, theta_b0_, theta_n0_, theta_m0_;
 
-  bool use_matter_;
   double zstart_, ztarget_, astart_, atarget_, kmax_, kmin_, h_, tnorm_, f_b_, f_c_;
 
   
@@ -420,10 +420,23 @@ private:
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cdm, tau, &d_cdm[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_b, tau, &d_b[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_ncdm1, tau, &d_ncdm[0]);
+    if( total_type_ == cosmology::MATTER_ ){
+      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_m, tau, &d_tot[0]);
+    }else if( total_type_ == cosmology::BPLUSC_ ){
+      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cb, tau, &d_tot[0]);
+    }else if ( total_type_ == cosmology::TOTAL_ ){
+      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_tot, tau, &d_tot[0]);
+    }
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_m, tau, &d_tot[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_b, tau, &t_b[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_ncdm1, tau, &t_ncdm[0]);
-    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_m, tau, &t_tot[0]);
+    if( total_type_ == cosmology::MATTER_ ){
+      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_m, tau, &t_tot[0]);
+    }else if( total_type_ == cosmology::BPLUSC_ ){
+      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_cb, tau, &t_tot[0]);
+    }else if ( total_type_ == cosmology::TOTAL_ ){
+      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_tot, tau, &t_tot[0]);
+    }
 
     // metric perturbations
     std::vector<double> h_prime(pt_.k_size[index_md],0.0), eta_prime(pt_.k_size[index_md],0.0);
@@ -460,11 +473,11 @@ private:
       d_cdm[i]  = -d_cdm[i] * ik2;
       d_b[i]    = -d_b[i] * ik2;
       d_ncdm[i] = -d_ncdm[i] * ik2;
-      d_tot[i]  = use_matter_? -d_tot[i] * ik2 : (f_c_*d_cdm[i]+f_b_*d_b[i]);
+      d_tot[i]  = -d_tot[i] * ik2;
       t_cdm[i]  = -t_cdm[i] * ik2;
       t_b[i]    = -t_b[i] * ik2;
       t_ncdm[i] = -t_ncdm[i] * ik2;
-      t_tot[i]  = use_matter_? -t_tot[i] * ik2 : (f_c_*t_cdm[i]+f_b_*t_b[i]);
+      t_tot[i]  = -t_tot[i] * ik2;
     }
 
     return _SUCCESS_;
@@ -479,12 +492,12 @@ public:
     ofs_class_input_.open(cf.get_path_relative_to_config("input_class_parameters.ini"), std::ios::trunc);
 
     // all cosmological parameters need to be passed through the_cosmo_calc
-
-    use_matter_ = pcf_->get_value_safe<bool>("cosmology", "class_use_matter", true);    
     ztarget_ = pcf_->get_value_safe<double>("cosmology", "ztarget", 0.0);
     atarget_ = 1.0 / (1.0 + ztarget_);
     zstart_ = pcf_->get_value<double>("setup", "zstart");
     astart_ = 1.0 / (1.0 + zstart_);
+
+    total_type_ = cosmo_params_.get_total_type();
 
     f_b_ = cosmo_params_["Omega_b"] / (cosmo_params_["Omega_b"] + cosmo_params_["Omega_c"]);
     f_c_ = cosmo_params_["Omega_c"] / (cosmo_params_["Omega_b"] + cosmo_params_["Omega_c"]);
@@ -518,6 +531,22 @@ public:
     tnorm_ = std::sqrt(2.0 * M_PI * M_PI * A_s_ * std::pow(1.0 / k_p, cosmo_params["n_s"] - 1) / std::pow(2.0 * M_PI, 3.0));
 
     // compute the transfer function at z=0 using CLASS engine
+    music::ilog << "CLASS is set to use for the \'total\' transfer function: ";
+    switch( total_type_ ){
+      case cosmology::MATTER_:
+        music::ilog << colors::CONFIG_VALUE << "matter";
+        break;
+      case cosmology::BPLUSC_:
+        music::ilog << colors::CONFIG_VALUE << "CDM+baryon";
+        break;
+      case cosmology::TOTAL_:
+        music::ilog << colors::CONFIG_VALUE << "total";
+        break;
+      default:
+        throw std::runtime_error("Invalid total_type_ in transfer_CLASS_plugin");
+    }
+    music::ilog << colors::RESET << std::endl;
+
     std::vector<double> k, dc, tc, db, tb, dn, tn, dm, tm;
     this->run_ClassEngine(0.0, k, dc, tc, db, tb, dn, tn, dm, tm);
 
