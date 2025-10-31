@@ -313,6 +313,16 @@ if(ENABLE_CLASS)
 endif()
 
 ########################################################################################################################
+# include CAMB (via Python bindings)
+option(ENABLE_CAMB "Enable CAMB support via Python bindings." OFF)
+
+if(ENABLE_CAMB)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/external/camb.cmake)
+  target_link_libraries(${PRGNAME} PRIVATE camb_interface)
+  target_compile_definitions(${PRGNAME} PRIVATE "USE_CAMB")
+endif()
+
+########################################################################################################################
 # include GenericIO (only if MPI available)
 include(CMakeDependentOption)
 cmake_dependent_option(ENABLE_GENERICIO "Enable GenericIO (HACC) output support" off "ENABLE_MPI;MPI_CXX_FOUND" off)

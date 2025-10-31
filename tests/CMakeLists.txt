@@ -162,6 +162,7 @@ list(FILTER TEST_TRANSFER_SOURCES EXCLUDE REGEX ".*main\\.cc$")
 file(GLOB TEST_TRANSFER_PLUGINS
     ${PROJECT_SOURCE_DIR}/src/plugins/transfer_*.cc
     ${PROJECT_SOURCE_DIR}/src/plugins/random_*.cc
+    ${PROJECT_SOURCE_DIR}/src/plugins/camb_interface.cc
 )
 
 # Add the test executable (no version.cc needed since we exclude output plugins)
@@ -254,6 +255,12 @@ endif()
 if(ENABLE_CLASS)
     target_link_libraries(test_transfer_functions PRIVATE class::libclass)
     target_compile_definitions(test_transfer_functions PRIVATE "USE_CLASS")
+endif()
+
+# CAMB
+if(ENABLE_CAMB)
+    target_link_libraries(test_transfer_functions PRIVATE camb_interface)
+    target_compile_definitions(test_transfer_functions PRIVATE "USE_CAMB")
 endif()
 
 # Helper function to add a transfer function regression test

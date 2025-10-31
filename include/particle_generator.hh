@@ -497,7 +497,7 @@ namespace particle
                     }
                 }
             }
-            else
+            else // glass
             {
                 glass_ptr_->update_ghosts( field );
                 #pragma omp parallel for
