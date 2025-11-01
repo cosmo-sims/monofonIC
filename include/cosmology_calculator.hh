@@ -423,8 +423,10 @@ public:
 
             // write power spectrum to a file
             std::ofstream ofs(fname.c_str());
-            std::stringstream ss;
-            ss << " ,ap=" << astart_ << "";
+            // std::stringstream ss;
+            // ss << " ,ap=" << astart_ << "";
+            ofs << "# ap = " << astart_ << std::endl;
+            ofs << "# note that this is the total transfer, including the primordial k**(n_s/2) piece" << std::endl;
             ofs << "# " << std::setw(18) << "k [h/Mpc]"
                 << std::setw(20) << ("delta_c(k,a=ap)")
                 << std::setw(20) << ("delta_b(k,a=ap)")

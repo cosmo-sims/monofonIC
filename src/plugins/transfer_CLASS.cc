@@ -385,7 +385,6 @@ private:
     t_cdm.clear(); t_b.clear(); t_ncdm.clear(); t_tot.clear();
     
     z = std::max(z,1e-10);
-    // the_ClassEngine_->getTk(z, k, dc, db, dn, dm, tc, tb, tn, tm);
 
     //transform redshift in conformal time
     double tau;
@@ -398,7 +397,10 @@ private:
 
     double *pvecback=new double[ba_.bg_size];
     background_at_tau(&ba_,tau,long_info,inter_normal, &index, pvecback);
+    // fHa = f * a' = f * a * Hcal
     double fHa = pvecback[ba_.index_bg_f] * (pvecback[ba_.index_bg_a]*pvecback[ba_.index_bg_H]);
+    // correction factor for total matter perturbations in case of non-clustering dark energy fluid
+    double fac_tot = pvecback[ba_.index_bg_rho_tot] / (pvecback[ba_.index_bg_rho_tot] - pvecback[ba_.index_bg_rho_fld]);
     delete[] pvecback;
 
     //...
@@ -418,26 +420,35 @@ private:
     }
 
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cdm, tau, &d_cdm[0]);
+    
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_b, tau, &d_b[0]);
-    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_ncdm1, tau, &d_ncdm[0]);
-    if( total_type_ == cosmology::MATTER_ ){
-      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_m, tau, &d_tot[0]);
-    }else if( total_type_ == cosmology::BPLUSC_ ){
-      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cb, tau, &d_tot[0]);
-    }else if ( total_type_ == cosmology::TOTAL_ ){
-      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_tot, tau, &d_tot[0]);
-    }
-    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_m, tau, &d_tot[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_b, tau, &t_b[0]);
+    
+    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_ncdm1, tau, &d_ncdm[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_ncdm1, tau, &t_ncdm[0]);
-    if( total_type_ == cosmology::MATTER_ ){
-      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_m, tau, &t_tot[0]);
-    }else if( total_type_ == cosmology::BPLUSC_ ){
-      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_cb, tau, &t_tot[0]);
-    }else if ( total_type_ == cosmology::TOTAL_ ){
-      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_tot, tau, &t_tot[0]);
-    }
 
+    switch( total_type_ ){
+      case cosmology::MATTER_ :
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_m, tau, &d_tot[0]);
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_m, tau, &t_tot[0]);
+        break;
+      case cosmology::BPLUSC_ :
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cb, tau, &d_tot[0]);
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_cb, tau, &t_tot[0]);
+        break;
+      case cosmology::TOTAL_ :
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_tot, tau, &d_tot[0]);
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_tot, tau, &t_tot[0]);
+        // since we are now using always a dark fluid component for DE, we have to subtract its (non-clustering) contribution, 
+        // when the 'total' option is chosen, otherwise the total matter perturbation is wrong
+        for (int index_k=0; index_k<pt_.k_size[index_md]; index_k++) 
+        {
+          d_tot[index_k] *= fac_tot;
+          t_tot[index_k] *= fac_tot;
+        }
+        break;
+    }
+    
     // metric perturbations
     std::vector<double> h_prime(pt_.k_size[index_md],0.0), eta_prime(pt_.k_size[index_md],0.0);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_eta_prime, tau, &eta_prime[0]);
