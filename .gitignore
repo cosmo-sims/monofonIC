@@ -12,3 +12,6 @@ src/Makefile
 external/panphasia/rand_base.mod
 external/panphasia/rand_int.mod
 external/panphasia/rand.mod
+tests/configs/*.txt
+tests/configs/transfer/*.txt
+tests/configs/transfer/*.ini

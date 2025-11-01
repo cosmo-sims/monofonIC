@@ -23,8 +23,6 @@
 #include <memory>
 #include <sstream>
 
-#include <ClassEngine.hh>
-
 #include <general.hh>
 #include <config_file.hh>
 #include <transfer_function_plugin.hh>
@@ -32,8 +30,41 @@
 
 #include <math/interpolate.hh>
 
+// disable warnings that pop up due to CLASS headers non-compliance.
+#pragma GCC diagnostic ignored "-Wvariadic-macros"
+#include "class.h"
+#pragma GCC diagnostic pop
+
+#include "transfer_CLASS.hh"
+
+// External declarations for CLASS version information
+extern "C" {
+  extern const char *CLASS_GIT_REV;
+  extern const char *CLASS_GIT_TAG;
+  extern const char *CLASS_GIT_BRANCH;
+}
+
 class transfer_CLASS_plugin : public TransferFunction_plugin
 {
+protected:
+    // structs containing all the CLASS parameters
+    struct file_content fc_;
+    struct precision pr_;
+    struct background ba_;
+    struct thermodynamics th_;           /* for thermodynamics */
+    struct perturbations pt_;         /* for source functions */
+    struct transfer tr_;        /* for transfer functions */
+    struct primordial pm_;       /* for primordial spectra */
+    struct harmonic sp_;          /* for output spectra */
+    struct fourier nl_;        /* for non-linear spectra */
+    struct lensing le_;          /* for lensed spectra */
+    struct distortions sd_;          /* for distortions */
+    struct output op_;           /* for output files */
+
+    ClassParams pars_;
+    bool class_dofree_;
+    cosmology::total_type_t total_type_;
+
 private:
   
   using TransferFunction_plugin::cosmo_params_;
@@ -41,10 +72,10 @@ private:
   interpolated_function_1d<true, true, false> delta_c_, delta_b_, delta_n_, delta_m_, theta_c_, theta_b_, theta_n_, theta_m_;
   interpolated_function_1d<true, true, false> delta_c0_, delta_b0_, delta_n0_, delta_m0_, theta_c0_, theta_b0_, theta_n0_, theta_m0_;
 
-  double zstart_, ztarget_, astart_, atarget_, kmax_, kmin_, h_, tnorm_;
+  double zstart_, ztarget_, astart_, atarget_, kmax_, kmin_, h_, tnorm_, f_b_, f_c_;
 
-  ClassParams pars_;
-  std::unique_ptr<ClassEngine> the_ClassEngine_;
+  
+  // std::unique_ptr<ClassEngine> the_ClassEngine_;
   std::ofstream ofs_class_input_;
 
   template <typename T>
@@ -60,7 +91,7 @@ private:
     //--- general parameters ------------------------------------------
     add_class_parameter("z_max_pk", std::max(std::max(zstart_, ztarget_),199.0)); // use 1.2 as safety
     add_class_parameter("P_k_max_h/Mpc", std::max(2.0,kmax_));
-    add_class_parameter("output", "dTk,vTk");
+    add_class_parameter("output", "dTk,vTk,mTk,mPk");
     add_class_parameter("extra metric transfer functions","yes");
     // add_class_parameter("lensing", "no");
 
@@ -74,13 +105,14 @@ private:
     add_class_parameter("Omega_b", cosmo_params_.get("Omega_b"));
     add_class_parameter("Omega_cdm", cosmo_params_.get("Omega_c"));
     add_class_parameter("Omega_k", cosmo_params_.get("Omega_k"));
-    add_class_parameter("Omega_fld", 0.0);
+    // add_class_parameter("Omega_fld", 0.0);
     add_class_parameter("Omega_scf", 0.0);
 
 
     // add_class_parameter("fluid_equation_of_state","CLP");
-    // add_class_parameter("w0_fld", -1 );
-    // add_class_parameter("wa_fld", 0. );
+    add_class_parameter("Omega_Lambda", 0.0);
+    add_class_parameter("w0_fld", cosmo_params_.get("w_0") );
+    add_class_parameter("wa_fld", cosmo_params_.get("w_a") );
     // add_class_parameter("cs2_fld", 1);
 
     //--- massive neutrinos -------------------------------------------
@@ -94,12 +126,19 @@ private:
     
     add_class_parameter("N_ur", cosmo_params_.get("N_ur"));
     add_class_parameter("N_ncdm", cosmo_params_.get("N_nu_massive"));
+    const double Tnu = std::pow(4./11.,1./3.);
+
     if( cosmo_params_.get("N_nu_massive") > 0 ){
       std::stringstream sstr;
       if( cosmo_params_.get("m_nu1") > 1e-9 ) sstr << cosmo_params_.get("m_nu1");
       if( cosmo_params_.get("m_nu2") > 1e-9 ) sstr << ", " << cosmo_params_.get("m_nu2");
       if( cosmo_params_.get("m_nu3") > 1e-9 ) sstr << ", " << cosmo_params_.get("m_nu3");
       add_class_parameter("m_ncdm", sstr.str().c_str());
+      sstr.str(std::string());
+      if( cosmo_params_.get("m_nu1") > 1e-9 ) sstr << Tnu;
+      if( cosmo_params_.get("m_nu2") > 1e-9 ) sstr << ", " << Tnu;
+      if( cosmo_params_.get("m_nu3") > 1e-9 ) sstr << ", " << Tnu;
+      add_class_parameter("T_ncdm", sstr.str().c_str());
     }
     
     // change above to enable
@@ -109,7 +148,7 @@ private:
 #endif
 
     //--- cosmological parameters, primordial -------------------------
-    add_class_parameter("P_k_ini type", "analytic_Pk");
+    // add_class_parameter("P_k_ini type", "analytic_Pk");
 
     if( cosmo_params_.get("A_s") > 0.0 ){
       add_class_parameter("A_s", cosmo_params_.get("A_s"));
@@ -128,8 +167,12 @@ private:
     add_class_parameter("k_per_decade_for_pk", 100);
     add_class_parameter("k_per_decade_for_bao", 100);
     add_class_parameter("compute damping scale", "yes");
-    add_class_parameter("tol_perturb_integration", 1.e-8);
+    add_class_parameter("tol_perturbations_integration", 1.e-8);
     add_class_parameter("tol_background_integration", 1e-9);
+    add_class_parameter("l_max_g" , 31);
+    add_class_parameter("l_max_pol_g" , 31);
+    add_class_parameter("l_max_ur" , 31);
+    add_class_parameter("l_max_ncdm" , 31);
 
     // high precision options from cl_permille.pre:
     // precision file to be passed as input in order to achieve at least percent precision on scalar Cls
@@ -139,7 +182,6 @@ private:
     add_class_parameter("transfer_neglect_delta_k_S_t2", 0.17);
     add_class_parameter("transfer_neglect_delta_k_S_e", 0.13);
     add_class_parameter("delta_l_max", 1000);
-
     int class_verbosity = 0;
 
     add_class_parameter("background_verbose", class_verbosity);
@@ -147,8 +189,8 @@ private:
     add_class_parameter("perturbations_verbose", class_verbosity);
     add_class_parameter("transfer_verbose", class_verbosity);
     add_class_parameter("primordial_verbose", class_verbosity);
-    add_class_parameter("spectra_verbose", class_verbosity);
-    add_class_parameter("nonlinear_verbose", class_verbosity);
+    add_class_parameter("harmonic_verbose", class_verbosity);
+    add_class_parameter("fourier_verbose", class_verbosity);
     add_class_parameter("lensing_verbose", class_verbosity);
     add_class_parameter("output_verbose", class_verbosity);
 
@@ -163,21 +205,274 @@ private:
     music::ilog << "Computing transfer function via ClassEngine..." << std::endl;
     double wtime = get_wtime();
 
-    the_ClassEngine_ = std::make_unique<ClassEngine>(pars_, false);
+    //.........................................................................
+    this->setup_class( pars_ );
+    //.........................................................................
 
     wtime = get_wtime() - wtime;
     music::ilog << "CLASS took " << wtime << " s." << std::endl;
   }
 
+  /*! \brief Set up CLASS engine with parameters
+   *
+   *  \param pars ClassParams object containing the parameters
+   *  \return _SUCCESS_ or _FAILURE_
+   */
+  int setup_class( const ClassParams &pars )
+  {
+    
+    ErrorMsg errmsg;
+
+    //prepare fp structure
+    std::vector<std::string> parNames;
+    size_t n=pars.size();
+    char dummystr[] = "dummy";
+    parser_init(&fc_,n,dummystr, errmsg);
+    
+    //config
+    for (size_t i=0;i<pars.size();i++){
+      strcpy(fc_.name[i],pars.key(i).c_str());
+      strcpy(fc_.value[i],pars.value(i).c_str());
+      parNames.push_back(pars.key(i));
+    }
+
+    // if (input_init(&fc_,&pr_,&ba_,&th_,&pt_,&tr_,&pm_,&sp_,&nl_,&le_,&op_,errmsg) == _FAILURE_) {
+    if (input_read_from_file(&fc_, &pr_, &ba_, &th_, &pt_, &tr_, &pm_, &sp_, &nl_, &le_, &sd_, &op_, errmsg) == _FAILURE_){
+      music::elog.Print(" running input_init_from_arguments \n=>%s\n",errmsg);
+      class_dofree_=false;
+      return _FAILURE_;
+    }
+
+    // proetction parametres mal defini
+    for (size_t i = 0; i < pars.size(); i++)
+    {
+      if (fc_.read[i] != _TRUE_)
+        throw std::runtime_error(std::string("invalid CLASS parameter: ") + fc_.name[i]);
+    }
+
+    if (background_init(&pr_,&ba_) == _FAILURE_) {
+      music::elog.Print(" running background_init \n=>%s\n",ba_.error_message);
+      class_dofree_=false;
+      return _FAILURE_;
+    }
+
+    if (thermodynamics_init(&pr_,&ba_,&th_) == _FAILURE_) {
+      music::elog.Print(" in thermodynamics_init \n=>%s\n",th_.error_message);
+      background_free(&ba_);
+      class_dofree_=false;
+      return _FAILURE_;
+    }
+
+    if (perturbations_init(&pr_,&ba_,&th_,&pt_) == _FAILURE_) {
+      music::elog.Print(" in perturb_init \n=>%s\n",pt_.error_message);
+      thermodynamics_free(&th_);
+      background_free(&ba_);
+      class_dofree_=false;
+      return _FAILURE_;
+    }
+
+    if (primordial_init(&pr_,&pt_,&pm_) == _FAILURE_) {
+      music::elog.Print(" in primordial_init \n=>%s\n",pm_.error_message);
+      perturbations_free(&pt_);
+      thermodynamics_free(&th_);
+      background_free(&ba_);
+      class_dofree_=false;
+      return _FAILURE_;
+    }
+
+    if (fourier_init(&pr_,&ba_,&th_,&pt_,&pm_,&nl_) == _FAILURE_)  {
+      music::elog.Print(" in fourier_init \n=>%s\n",nl_.error_message);
+      primordial_free(&pm_);
+      perturbations_free(&pt_);
+      thermodynamics_free(&th_);
+      background_free(&ba_);
+      class_dofree_=false;
+      return _FAILURE_;
+    }
+
+    if (transfer_init(&pr_,&ba_,&th_,&pt_,&nl_,&tr_) == _FAILURE_) {
+      music::elog.Print(" in transfer_init \n=>%s\n",tr_.error_message);
+      fourier_free(&nl_);
+      primordial_free(&pm_);
+      perturbations_free(&pt_);
+      thermodynamics_free(&th_);
+      background_free(&ba_);
+      class_dofree_=false;
+      return _FAILURE_;
+    }
+
+    if (harmonic_init(&pr_,&ba_,&pt_,&pm_,&nl_,&tr_,&sp_) == _FAILURE_) {
+      music::elog.Print(" in harmonic_init \n=>%s\n",sp_.error_message);
+      transfer_free(&tr_);
+      fourier_free(&nl_);
+      primordial_free(&pm_);
+      perturbations_free(&pt_);
+      thermodynamics_free(&th_);
+      background_free(&ba_);
+      class_dofree_=false;
+      return _FAILURE_;
+    }
+
+    if (lensing_init(&pr_,&pt_,&sp_,&nl_,&le_) == _FAILURE_) {
+      music::elog.Print(" in lensing_init \n=>%s\n",le_.error_message);
+      harmonic_free(&sp_);
+      transfer_free(&tr_);
+      fourier_free(&nl_);
+      primordial_free(&pm_);
+      perturbations_free(&pt_);
+      thermodynamics_free(&th_);
+      background_free(&ba_);
+      class_dofree_=false;
+      return _FAILURE_;
+    }
+
+    if (distortions_init(&pr_, &ba_, &th_, &pt_, &pm_, &sd_) == _FAILURE_)
+    {
+      music::elog.Print(" in distortions_init \n=>%s\n", sd_.error_message);
+      lensing_free(&le_);
+      harmonic_free(&sp_);
+      transfer_free(&tr_);
+      fourier_free(&nl_);
+      primordial_free(&pm_);
+      perturbations_free(&pt_);
+      thermodynamics_free(&th_);
+      background_free(&ba_);
+      class_dofree_ = false;
+      return _FAILURE_;
+    }
+
+    class_dofree_=true;
+    return _SUCCESS_;
+  }
+
+  int free_class()
+  {
+    if (class_dofree_) {
+      distortions_free(&sd_);
+      lensing_free(&le_);
+      harmonic_free(&sp_);
+      transfer_free(&tr_);
+      fourier_free(&nl_);
+      primordial_free(&pm_);
+      perturbations_free(&pt_);
+      thermodynamics_free(&th_);
+      background_free(&ba_);
+      class_dofree_=false;
+    }
+    return _SUCCESS_;
+  }
+
+  void call_perturb_sources_at_tau(
+                            int index_md,
+                            int index_ic,
+                            int index_tp,
+                            double tau,
+                            double * psource
+                            ) {
+    if (perturbations_sources_at_tau(&pt_, index_md, index_ic, index_tp, tau, psource) == _FAILURE_)
+    {
+      std::cerr << ">>>fail getting Tk type=" << (int)index_tp <<std::endl; 
+      throw std::runtime_error(pt_.error_message);
+    }
+  }
+
   //! run ClassEngine with parameters set up
-  void run_ClassEngine(double z, std::vector<double> &k, std::vector<double> &dc, std::vector<double> &tc, std::vector<double> &db, std::vector<double> &tb,
-                       std::vector<double> &dn, std::vector<double> &tn, std::vector<double> &dm, std::vector<double> &tm)
+  int run_ClassEngine(double z, std::vector<double> &k, std::vector<double> &d_cdm, std::vector<double> &t_cdm, std::vector<double> &d_b, std::vector<double> &t_b,
+                       std::vector<double> &d_ncdm, std::vector<double> &t_ncdm, std::vector<double> &d_tot, std::vector<double> &t_tot)
   {
     k.clear(); 
-    dc.clear(); db.clear(); dn.clear(); dm.clear();
-    tc.clear(); tb.clear(); tn.clear(); tm.clear();
+    d_cdm.clear(); d_b.clear(); d_ncdm.clear(); d_tot.clear();
+    t_cdm.clear(); t_b.clear(); t_ncdm.clear(); t_tot.clear();
     
-    the_ClassEngine_->getTk(z, k, dc, db, dn, dm, tc, tb, tn, tm);
+    z = std::max(z,1e-10);
+
+    //transform redshift in conformal time
+    double tau;
+    int index;
+    background_tau_of_z(&ba_,z,&tau);
+    if(std::log(tau) < pt_.ln_tau[0]){
+      music::elog << "Asking sources at a z bigger than z_max_pk, something probably went wrong\n";
+      throw std::runtime_error(pt_.error_message);
+    }
+
+    double *pvecback=new double[ba_.bg_size];
+    background_at_tau(&ba_,tau,long_info,inter_normal, &index, pvecback);
+    // fHa = f * a' = f * a * Hcal
+    double fHa = pvecback[ba_.index_bg_f] * (pvecback[ba_.index_bg_a]*pvecback[ba_.index_bg_H]);
+    // correction factor for total matter perturbations in case of non-clustering dark energy fluid
+    double fac_tot = pvecback[ba_.index_bg_rho_tot] / (pvecback[ba_.index_bg_rho_tot] - pvecback[ba_.index_bg_rho_fld]);
+    delete[] pvecback;
+
+    //...
+    // copy transfer func data to temporary
+    const size_t index_md = pt_.index_md_scalars;
+    d_cdm.assign( pt_.k_size[index_md], 0.0 );
+    d_b.assign( pt_.k_size[index_md], 0.0 );
+    d_ncdm.assign( pt_.k_size[index_md], 0.0 );
+    d_tot.assign( pt_.k_size[index_md], 0.0 );
+    t_cdm.assign( pt_.k_size[index_md], 0.0 );
+    t_b.assign( pt_.k_size[index_md], 0.0 );
+    t_ncdm.assign( pt_.k_size[index_md], 0.0 );
+    t_tot.assign( pt_.k_size[index_md], 0.0 );
+
+    if( pt_.ic_size[index_md] > 1 ){
+      std::cerr << ">>>have more than 1 ICs, will use first and ignore others" << std::endl;
+    }
+
+    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cdm, tau, &d_cdm[0]);
+    
+    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_b, tau, &d_b[0]);
+    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_b, tau, &t_b[0]);
+    
+    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_ncdm1, tau, &d_ncdm[0]);
+    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_ncdm1, tau, &t_ncdm[0]);
+
+    switch( total_type_ ){
+      case cosmology::MATTER_ :
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_m, tau, &d_tot[0]);
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_m, tau, &t_tot[0]);
+        break;
+      case cosmology::BPLUSC_ :
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cb, tau, &d_tot[0]);
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_cb, tau, &t_tot[0]);
+        break;
+      case cosmology::TOTAL_ :
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_tot, tau, &d_tot[0]);
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_tot, tau, &t_tot[0]);
+        // since we are now using always a dark fluid component for DE, we have to subtract its (non-clustering) contribution, 
+        // when the 'total' option is chosen, otherwise the total matter perturbation is wrong
+        for (int index_k=0; index_k<pt_.k_size[index_md]; index_k++) 
+        {
+          d_tot[index_k] *= fac_tot;
+          t_tot[index_k] *= fac_tot;
+        }
+        break;
+    }
+    
+    // metric perturbations
+    std::vector<double> h_prime(pt_.k_size[index_md],0.0), eta_prime(pt_.k_size[index_md],0.0);
+    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_eta_prime, tau, &eta_prime[0]);
+    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_h_prime, tau, &h_prime[0]);
+
+    // gauge trafo velocities, store k-vector
+    for (int index_k=0; index_k<pt_.k_size[index_md]; index_k++) 
+    {
+      auto ak = pt_.k[index_md][index_k];
+
+      // write data to vectors
+      k.push_back( ak );
+
+      // use the conformal Newtonian gauge for velocities
+      // not correct, but N-body gauge currently not implemented
+      double alphak2 = (h_prime[index_k]+6*eta_prime[index_k])/2; 
+
+      t_cdm[index_k]  = (-alphak2) / fHa;
+      t_b[index_k]    = (-alphak2 + t_b[index_k]) / fHa;
+      t_ncdm[index_k] = (-alphak2 + t_ncdm[index_k]) / fHa;
+      t_tot[index_k]  = (-alphak2 + t_tot[index_k]) / fHa;
+    }
+
+    //...
 
     const double h  = cosmo_params_.get("h");
 
@@ -185,16 +480,18 @@ private:
     {
       // convert to 'CAMB' format, since we interpolate loglog and
       // don't want negative numbers...
-      auto ik2 = 1.0 / (k[i] * k[i]) * h * h;
-      dc[i] = -dc[i] * ik2;
-      db[i] = -db[i] * ik2;
-      dn[i] = -dn[i] * ik2;
-      dm[i] = -dm[i] * ik2;
-      tc[i] = -tc[i] * ik2;
-      tb[i] = -tb[i] * ik2;
-      tn[i] = -tn[i] * ik2;
-      tm[i] = -tm[i] * ik2;
+      auto ik2  = 1.0 / (k[i] * k[i]) * h * h;
+      d_cdm[i]  = -d_cdm[i] * ik2;
+      d_b[i]    = -d_b[i] * ik2;
+      d_ncdm[i] = -d_ncdm[i] * ik2;
+      d_tot[i]  = -d_tot[i] * ik2;
+      t_cdm[i]  = -t_cdm[i] * ik2;
+      t_b[i]    = -t_b[i] * ik2;
+      t_ncdm[i] = -t_ncdm[i] * ik2;
+      t_tot[i]  = -t_tot[i] * ik2;
     }
+
+    return _SUCCESS_;
   }
 
 public:
@@ -206,22 +503,29 @@ public:
     ofs_class_input_.open(cf.get_path_relative_to_config("input_class_parameters.ini"), std::ios::trunc);
 
     // all cosmological parameters need to be passed through the_cosmo_calc
-    
     ztarget_ = pcf_->get_value_safe<double>("cosmology", "ztarget", 0.0);
     atarget_ = 1.0 / (1.0 + ztarget_);
     zstart_ = pcf_->get_value<double>("setup", "zstart");
     astart_ = 1.0 / (1.0 + zstart_);
 
-    h_ = cosmo_params_["h"];
+    total_type_ = cosmo_params_.get_total_type();
+
+    f_b_ = cosmo_params_["Omega_b"] / (cosmo_params_["Omega_b"] + cosmo_params_["Omega_c"]);
+    f_c_ = cosmo_params_["Omega_c"] / (cosmo_params_["Omega_b"] + cosmo_params_["Omega_c"]);
+    h_   = cosmo_params_["h"];
     
+    music::ilog << "CLASS: Version: git rev.: " << CLASS_GIT_REV
+                << ", tag: " << CLASS_GIT_TAG
+                << ", branch: " << CLASS_GIT_BRANCH << std::endl;
+
     if (cosmo_params_["A_s"] > 0.0) {
-      music::ilog << "CLASS: Using A_s=" << cosmo_params_["A_s"] << " to normalise the transfer function." << std::endl;
+      music::ilog << "CLASS: Using A_s=" << colors::CONFIG_VALUE << cosmo_params_["A_s"] << colors::RESET << " to normalise the transfer function." << std::endl;
     }else{
       double sigma8 = cosmo_params_["sigma_8"];
       if( sigma8 < 0 ){
         throw std::runtime_error("Need to specify either A_s or sigma_8 for CLASS plugin...");
       }
-      music::ilog << "CLASS: Using sigma8_ =" << sigma8<< " to normalise the transfer function." << std::endl;
+      music::ilog << "CLASS: Using sigma8_ =" << colors::CONFIG_VALUE << sigma8 << colors::RESET << " to normalise the transfer function." << std::endl;
     }
 
     // determine highest k we will need for the resolution selected
@@ -231,13 +535,29 @@ public:
 
     // initialise CLASS and get the normalisation
     this->init_ClassEngine();
-    double A_s_ = the_ClassEngine_->get_A_s(); // this either the input one, or the one computed from sigma8
-    
+    double A_s_ = pm_.A_s;//the_ClassEngine_->get_A_s(); // this either the input one, or the one computed from sigma8
+
     // compute the normalisation to interface with MUSIC
     double k_p = cosmo_params["k_p"] / cosmo_params["h"];
     tnorm_ = std::sqrt(2.0 * M_PI * M_PI * A_s_ * std::pow(1.0 / k_p, cosmo_params["n_s"] - 1) / std::pow(2.0 * M_PI, 3.0));
 
     // compute the transfer function at z=0 using CLASS engine
+    music::ilog << "CLASS is set to use for the \'total\' transfer function: ";
+    switch( total_type_ ){
+      case cosmology::MATTER_:
+        music::ilog << colors::CONFIG_VALUE << "matter";
+        break;
+      case cosmology::BPLUSC_:
+        music::ilog << colors::CONFIG_VALUE << "CDM+baryon";
+        break;
+      case cosmology::TOTAL_:
+        music::ilog << colors::CONFIG_VALUE << "total";
+        break;
+      default:
+        throw std::runtime_error("Invalid total_type_ in transfer_CLASS_plugin");
+    }
+    music::ilog << colors::RESET << std::endl;
+
     std::vector<double> k, dc, tc, db, tb, dn, tn, dm, tm;
     this->run_ClassEngine(0.0, k, dc, tc, db, tb, dn, tn, dm, tm);
 
@@ -264,15 +584,20 @@ public:
     kmin_ = k[0];
     kmax_ = k.back();
 
-    music::ilog << "CLASS table contains k = " << this->get_kmin() << " to " << this->get_kmax() << " h Mpc-1." << std::endl;
+    music::ilog << "CLASS table contains k = " << colors::CONFIG_VALUE << this->get_kmin() << colors::RESET << " to " << colors::CONFIG_VALUE << this->get_kmax() << colors::RESET << " h Mpc-1." << std::endl;
 
     tf_distinct_ = true;
     tf_withvel_ = true;
     tf_withtotal0_ = true;
+
+    // Free CLASS structures immediately after extracting transfer function data
+    // to avoid keeping ~116 MB in memory throughout the entire run
+    this->free_class();
   }
 
   ~transfer_CLASS_plugin()
   {
+    this->free_class();
   }
 
   inline double compute(double k, tf_type type) const

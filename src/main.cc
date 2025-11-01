@@ -21,6 +21,7 @@
 #include <fstream>
 #include <thread>
 #include <cfenv>
+#include <cstdlib>
 
 #if defined(_OPENMP)
 #include <omp.h>
@@ -63,6 +64,37 @@ void handle_eptr(std::exception_ptr eptr) // passing by value is ok
     }
 }
 
+void print_compile_time_info() {
+    // Ascii ART logo. generated via http://patorjk.com/software/taag/#p=display&f=Nancyj&t=monofonIC
+    music::ilog << "\n" << colors::LOGO
+                << " The unigrid version of MUSIC-2         .8888b                   dP  a88888b. \n"
+                << "                                        88   \"                   88 d8\'   `88 \n"
+                << "  88d8b.d8b. .d8888b. 88d888b. .d8888b. 88aaa  .d8888b. 88d888b. 88 88        \n"
+                << "  88\'`88\'`88 88\'  `88 88\'  `88 88\'  `88 88     88\'  `88 88\'  `88 88 88        \n"
+                << "  88  88  88 88.  .88 88    88 88.  .88 88     88.  .88 88    88 88 Y8.   .88 \n"
+                << "  dP  dP  dP `88888P\' dP    dP `88888P\' dP     `88888P\' dP    dP dP  Y88888P\' \n" << colors::RESET << std::endl;
+
+    // git and versioning info:
+    music::ilog << "Version: git rev.: " << GIT_REV << ", tag: " << GIT_TAG << ", branch: " << GIT_BRANCH << std::endl;
+
+    // Compilation CMake configuration, time etc info:
+    music::ilog << "This " << CMAKE_BUILDTYPE_STR << " build was compiled at " << __TIME__ << " on " <<  __DATE__ << std::endl;
+
+#ifdef __GNUC__
+    music::ilog << "Compiled with GNU C++ version " << __VERSION__ <<std::endl;
+#else
+    music::ilog << "Compiled with " << __VERSION__ << std::endl;
+#endif
+
+
+    music::ilog << music::HRULE << std::endl;
+    music::ilog << "Compile time options : " << std::endl;
+    music::ilog << "                       Precision : " << colors::CONFIG_VALUE << CMAKE_PRECISION_STR << colors::RESET << std::endl;
+    music::ilog << "                    Convolutions : " << colors::CONFIG_VALUE << CMAKE_CONVOLVER_STR << colors::RESET << std::endl;
+    music::ilog << "                             PLT : " << colors::CONFIG_VALUE << CMAKE_PLT_STR << colors::RESET << std::endl;
+    music::ilog << music::HRULE << std::endl;
+}
+
 /**
  * @brief the main routine of MUSIC2-monofonIC
  * 
@@ -100,42 +132,13 @@ int main( int argc, char** argv )
     }
 #endif
 
-    // Ascii ART logo. generated via http://patorjk.com/software/taag/#p=display&f=Nancyj&t=monofonIC
-    music::ilog << "\n"
-                << " The unigrid version of MUSIC-2         .8888b                   dP  a88888b. \n"
-                << "                                        88   \"                   88 d8\'   `88 \n"
-                << "  88d8b.d8b. .d8888b. 88d888b. .d8888b. 88aaa  .d8888b. 88d888b. 88 88        \n"
-                << "  88\'`88\'`88 88\'  `88 88\'  `88 88\'  `88 88     88\'  `88 88\'  `88 88 88        \n"
-                << "  88  88  88 88.  .88 88    88 88.  .88 88     88.  .88 88    88 88 Y8.   .88 \n"
-                << "  dP  dP  dP `88888P\' dP    dP `88888P\' dP     `88888P\' dP    dP dP  Y88888P\' \n" << std::endl;
-
-    // git and versioning info:
-    music::ilog << "Version: git rev.: " << GIT_REV << ", tag: " << GIT_TAG << ", branch: " << GIT_BRANCH << std::endl;
-    
-    // Compilation CMake configuration, time etc info:
-    music::ilog << "This " << CMAKE_BUILDTYPE_STR << " build was compiled at " << __TIME__ << " on " <<  __DATE__ << std::endl;
-
-#ifdef __GNUC__
-    music::ilog << "Compiled with GNU C++ version " << __VERSION__ <<std::endl;
-#else
-    music::ilog << "Compiled with " << __VERSION__ << std::endl;
-#endif
-
-    
-    music::ilog << "-------------------------------------------------------------------------------" << std::endl;
-    music::ilog << "Compile time options : " << std::endl;
-    music::ilog << "                       Precision : " << CMAKE_PRECISION_STR << std::endl;
-    music::ilog << "                    Convolutions : " << CMAKE_CONVOLVER_STR << std::endl;
-    music::ilog << "                             PLT : " << CMAKE_PLT_STR << std::endl;
-    music::ilog << "-------------------------------------------------------------------------------" << std::endl;
-
-
     //------------------------------------------------------------------------------
     // Parse command line options
     //------------------------------------------------------------------------------
 
     if (argc != 2)
     {
+        print_compile_time_info();
         // print_region_generator_plugins();
         cosmology::print_ParameterSets();
         print_TransferFunction_plugins();
@@ -150,10 +153,11 @@ int main( int argc, char** argv )
     config_file the_config(argv[1]);
     std::string log_filename = the_config.get_path_relative_to_config("log.txt");
     music::logger::set_output(log_filename);
+    print_compile_time_info();
     music::ilog << "                         argv[1] : " << argv[1] << std::endl;
     music::ilog << "                 config_basename : " << the_config.get_path_relative_to_config("") << std::endl;
     music::ilog << "                        log file : " << log_filename << std::endl;
-    music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+    music::ilog << music::HRULE << std::endl;
 
     //------------------------------------------------------------------------------
     // Set up FFTW
@@ -172,8 +176,31 @@ int main( int argc, char** argv )
     FFTW_API(mpi_init)();
 #endif
 
+    // Save original OMP_NUM_THREADS environment variable if set
+    const char* omp_num_threads_env = std::getenv("OMP_NUM_THREADS");
+    std::string original_omp_num_threads;
+    bool omp_num_threads_was_set = false;
+    if (omp_num_threads_env != nullptr) {
+        original_omp_num_threads = omp_num_threads_env;
+        omp_num_threads_was_set = true;
+    }
+
     CONFIG::num_threads = the_config.get_value_safe<unsigned>("execution", "NumThreads",std::thread::hardware_concurrency());
-    
+
+    // Check if OMP_NUM_THREADS was set and differs from config value
+    if (omp_num_threads_was_set) {
+        int env_num_threads = std::atoi(original_omp_num_threads.c_str());
+        if (env_num_threads > 0 && env_num_threads != CONFIG::num_threads) {
+            music::wlog << "OMP_NUM_THREADS environment variable (" << env_num_threads
+                       << ") differs from config value (" << CONFIG::num_threads
+                       << "). Using config value." << std::endl;
+        }
+    }
+
+    // Set OMP_NUM_THREADS to config value
+    std::string num_threads_str = std::to_string(CONFIG::num_threads);
+    setenv("OMP_NUM_THREADS", num_threads_str.c_str(), 1);
+
 #if defined(USE_FFTW_THREADS)
     if (CONFIG::FFTW_threads_ok)
         FFTW_API(plan_with_nthreads)(CONFIG::num_threads);
@@ -245,13 +272,23 @@ int main( int argc, char** argv )
 
     ///////////////////////////////////////////////////////////////////////
     // Initialise plug-ins
+    music::ilog << music::HRULE << std::endl;
+    music::ilog << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Initializing plugins" << colors::RESET << std::endl;
     try
     {
         ic_generator::initialise( the_config );
     }catch(...){
         handle_eptr( std::current_exception() );
         music::elog << "Problem during initialisation. See error(s) above. Exiting..." << std::endl;
-        #if defined(USE_MPI) 
+
+        // Restore original OMP_NUM_THREADS before exiting
+        if (omp_num_threads_was_set) {
+            setenv("OMP_NUM_THREADS", original_omp_num_threads.c_str(), 1);
+        } else {
+            unsetenv("OMP_NUM_THREADS");
+        }
+
+        #if defined(USE_MPI)
         MPI_Finalize();
         #endif
         return 1;
@@ -267,10 +304,12 @@ int main( int argc, char** argv )
 
     ///////////////////////////////////////////////////////////////////////
     // call the destructor of plugins before tearing down MPI
+    music::ilog << music::HRULE << std::endl;
+    music::ilog << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Finalizing" << colors::RESET << std::endl;
     ic_generator::reset();
     ///////////////////////////////////////////////////////////////////////
 
-    music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+    music::ilog << music::HRULE << std::endl;
     size_t peak_mem = memory::getPeakRSS();
 #if defined(USE_MPI)
     size_t peak_mem_max{0};
@@ -288,8 +327,15 @@ int main( int argc, char** argv )
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
 #endif
-        
-    music::ilog << "Done. Have a nice day!\n" << std::endl;
+
+    music::ilog << colors::SUCCESS << "Done. Have a nice day!" << colors::RESET << "\n" << std::endl;
+
+    // Restore original OMP_NUM_THREADS environment variable if it was set
+    if (omp_num_threads_was_set) {
+        setenv("OMP_NUM_THREADS", original_omp_num_threads.c_str(), 1);
+    } else {
+        unsetenv("OMP_NUM_THREADS");
+    }
 
     return 0;
 }

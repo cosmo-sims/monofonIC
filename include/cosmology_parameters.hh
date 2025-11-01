@@ -18,14 +18,28 @@
 
 #include <map>
 #include <string>
-#include <vector>
+#include <array>
 
 #include <physical_constants.hh>
 #include <config_file.hh>
 #include <general.hh>
 
+#include <math/interpolate.hh>
+
+#include <gsl/gsl_integration.h>
+#include <gsl/gsl_errno.h>
+#include <gsl/gsl_odeiv2.h>
+
 namespace cosmology
 {
+
+    //! type for what the "total matter" component is  
+    enum total_type_t {
+        TOTAL_,
+        MATTER_,
+        BPLUSC_
+    };
+
     //! structure for cosmological parameters
     class parameters
     {
@@ -37,6 +51,7 @@ namespace cosmology
         std::map<std::string, double> pmap_;  //!< All parameters are stored here as key-value pairs
 
         static defaultmmap_t default_pmaps_;  //!< Holds pre-defined parameter sets, see src/cosmology_parameters.cc 
+        cosmology::total_type_t total_type_ = TOTAL_;      //!< what the "total matter" component is
 
     public:
         //! get routine for cosmological parameter key-value pairs
@@ -71,6 +86,11 @@ namespace cosmology
         //! shortcut get routine for cosmological parameter key-value pairs through bracket operator
         inline double operator[](const std::string &key) const { return this->get(key); }
 
+        //! get routine for what the "total matter" component is
+        cosmology::total_type_t get_total_type() const noexcept {
+            return total_type_;
+        }
+
         //! default constructor does nothing
         parameters() {}
 
@@ -80,7 +100,7 @@ namespace cosmology
         //! main constructor for explicit construction from input config file
         explicit parameters( config_file &cf )
         {
-            music::ilog << "-------------------------------------------------------------------------------" << std::endl;
+            music::ilog << music::HRULE << std::endl;
             
             if( cf.get_value_safe<std::string>("cosmology","ParameterSet","none") == std::string("none"))
             {
@@ -131,6 +151,8 @@ namespace cosmology
                 //-------------------------------------------------------------------------------
                 // load predefined parameter set
                 //-------------------------------------------------------------------------------
+                pmap_["sigma_8"] = -1.0; // default to -1.0 unless set below
+
                 auto pset_name = cf.get_value<std::string>("cosmology","ParameterSet");
                 auto it = default_pmaps_.find( pset_name );
                 if( it == default_pmaps_.end() ){
@@ -141,43 +163,58 @@ namespace cosmology
                     }
                     throw std::runtime_error("Invalid value for cosmology/ParameterSet");
                 }else{
-                    music::ilog << "Loading cosmological parameter set \'" << it->first << "\'..." << std::endl;
+                    music::ilog << "Loading cosmological parameter set \'" << colors::CONFIG_VALUE << it->first << colors::RESET << "\'..." << std::endl;
                 }
+                // The order doesn't matter, so keep it in the order of the example.conf
+                std::array<std::string, 18> config_keys = {
+                    "Omega_m", "Omega_b", "Omega_L", "H0", "nspec", "n_s", "sigma_8", "A_s", "sigma_8", "Tcmb", "YHe",
+                    "k_p", "m_nu1", "m_nu2", "m_nu3", "N_ur", "w_0", "w_a"
+                };
+
+                for (const std::string &config_key: config_keys) {
+                    auto parameter_key = config_key;
+                    if (config_key == "H0") {
+                        parameter_key = "h";
+                    } else if (config_key == "nspec") {
+                        parameter_key = "n_s";
+                    } else if (config_key == "Omega_L") {
+                        parameter_key = "Omega_DE";
+                    }
+                    if (config_key == "N_ur") {
+                        if (
+                            cf.contains_key("cosmology/m_nu1") ||
+                            cf.contains_key("cosmology/m_nu2") ||
+                            cf.contains_key("cosmology/m_nu3")) {
+                            int N_nu_massive = int(it->second["m_nu1"] > 1e-9) + int(it->second["m_nu2"] > 1e-9) + int(
+                                                   it->second["m_nu3"] > 1e-9);
+
+                            const double N_ur = 3.046 - N_nu_massive;
+                            music::ilog << "Setting N_ur=" << N_ur << std::endl;
+                            it->second["N_ur"] = N_ur;
+                        }
+                    }
+                    if (cf.contains_key("cosmology/" + config_key)) {
+                        const auto original_parameter = it->second[parameter_key];
+                        auto replaced_parameter = cf.get_value_basic<double>("cosmology", config_key);
+                        if (parameter_key == "h") {
+                            replaced_parameter /= 100.0;
+                        }
+                        music::ilog << "Overriding parameter "<< std::setw(9) << std::left << parameter_key
+                                << ": " << original_parameter
+                                << " -> " << replaced_parameter << std::endl;
+                        it->second[parameter_key] = replaced_parameter;
+                        if (config_key == "sigma_8") {
+                            it->second["A_s"] = -1.0;
+                            music::ilog << "setting A_s=-1.0 as sigma_8 is set" << parameter_key << std::endl;
+                            // If sigma_8 and A_s is set, sigma_8 wins
+                        }
+                    }
+                }
+
 
                 // copy pre-defined set in
                 for( auto entry : it->second ){
                     pmap_[entry.first] = entry.second;
-                }
-
-                // ensure both A_s and sigma_8 are initialized
-                // (one will be -1 if not in the predefined set)
-                if( pmap_.find("sigma_8") == pmap_.end() ){
-                    pmap_["sigma_8"] = -1.0;
-                }
-                if( pmap_.find("A_s") == pmap_.end() ){
-                    pmap_["A_s"] = -1.0;
-                }
-
-                // allow overriding any parameter from config file
-                // this enables testing different cosmological parameters while using a base parameter set
-                std::vector<std::string> override_params = {
-                    "h", "H0", "Omega_m", "Omega_b", "Omega_DE", "Omega_L",
-                    "w_0", "w_a", "n_s", "A_s", "sigma_8", "k_p",
-                    "YHe", "N_ur", "m_nu1", "m_nu2", "m_nu3", "Tcmb"
-                };
-
-                for( const auto& param : override_params ){
-                    if( cf.contains_key("cosmology", param) ){
-                        // handle special cases for parameter name aliases
-                        if( param == "H0" ){
-                            pmap_["h"] = cf.get_value<double>("cosmology", "H0") / 100.0;
-                        } else if( param == "Omega_L" ){
-                            pmap_["Omega_DE"] = cf.get_value<double>("cosmology", "Omega_L");
-                        } else {
-                            pmap_[param] = cf.get_value<double>("cosmology", param);
-                        }
-                    }
-                    music::ilog << "Overriding parameter \'" << param << "\' from config file." << std::endl;
                 }
             }
 
@@ -228,20 +265,39 @@ namespace cosmology
             pmap_["vfact"] = 0.0;
 
             music::ilog << "Cosmological parameters are: " << std::endl;
-            music::ilog << " h        = " << std::setw(16) << this->get("h");
+            music::ilog << " h        = " << colors::CONFIG_VALUE << std::setw(16) << this->get("h") << colors::RESET;
             if( this->get("A_s") > 0.0 )
-              music::ilog << "A_s      = " << std::setw(16) << this->get("A_s");
+              music::ilog << "A_s      = " << colors::CONFIG_VALUE << std::setw(16) << this->get("A_s") << colors::RESET;
             else
-              music::ilog << "sigma_8  = " << std::setw(16) << this->get("sigma_8");
-            music::ilog << "n_s     = " << std::setw(16) << this->get("n_s") << std::endl;
-            music::ilog << " Omega_c  = " << std::setw(16) << this->get("Omega_c")  << "Omega_b  = " << std::setw(16) << this->get("Omega_b") << "Omega_m = " << std::setw(16) << this->get("Omega_m") << std::endl;
-            music::ilog << " Omega_r  = " << std::setw(16) << this->get("Omega_r")  << "Omega_nu = " << std::setw(16) << this->get("Omega_nu_massive") << "∑m_nu   = " << sum_m_nu << "eV" << std::endl;
-            music::ilog << " Omega_DE = " << std::setw(16) << this->get("Omega_DE") << "w_0      = " << std::setw(16) << this->get("w_0")      << "w_a     = " << std::setw(16) << this->get("w_a") << std::endl;
+              music::ilog << "sigma_8  = " << colors::CONFIG_VALUE << std::setw(16) << this->get("sigma_8") << colors::RESET;
+            music::ilog << "n_s     = " << colors::CONFIG_VALUE << std::setw(16) << this->get("n_s") << colors::RESET << std::endl;
+            music::ilog << " Omega_c  = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_c") << colors::RESET << "Omega_b  = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_b") << colors::RESET << "Omega_m = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_m") << colors::RESET << std::endl;
+            music::ilog << " Omega_r  = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_r") << colors::RESET << "Omega_nu = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_nu_massive") << colors::RESET << "∑m_nu   = " << colors::CONFIG_VALUE << sum_m_nu << colors::RESET << "eV" << std::endl;
+            music::ilog << " Omega_DE = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_DE") << colors::RESET << "w_0      = " << colors::CONFIG_VALUE << std::setw(16) << this->get("w_0") << colors::RESET << "w_a     = " << colors::CONFIG_VALUE << std::setw(16) << this->get("w_a") << colors::RESET << std::endl;
             //music::ilog << " Omega_k  = " << 1.0 - this->get("Omega_m") - this->get("Omega_r") - this->get("Omega_DE") << std::endl;
             if (this->get("Omega_r") > 0.0)
             {
                 music::wlog << " Radiation enabled, using Omega_r=" << this->get("Omega_r") << " internally for backscaling." << std::endl;
                 music::wlog << " Make sure your sim code supports this, otherwise set [cosmology] / ZeroRadiation=true." << std::endl;
+            }
+
+            //--------------------------------------------------------------------------------
+            // other parameters
+            //--------------------------------------------------------------------------------
+
+            auto tfstring = cf.get_value_safe<std::string>("cosmology","TransferComponent","total");
+            // Convert to lowercase for case-insensitive comparison
+            std::transform(tfstring.begin(), tfstring.end(), tfstring.begin(), ::tolower);
+            
+            if( tfstring == "total" ){
+                total_type_ = TOTAL_;
+            }else if( tfstring == "matter" ){
+                total_type_ = MATTER_;
+            }else if( tfstring == "baryonpluscdm" ){
+                total_type_ = BPLUSC_;
+            }else{
+                music::elog << "Unknown value for [cosmology] / TransferComponent: \'" << tfstring << "\'!" << std::endl;
+                throw std::runtime_error("Invalid value for cosmology/TransferComponent");
             }
         }
 
