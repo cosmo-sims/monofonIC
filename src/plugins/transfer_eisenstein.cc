@@ -212,6 +212,8 @@ class transfer_eisenstein_plugin : public TransferFunction_plugin
 
 protected:
   eisenstein_transfer etf_;
+  double tnorm_;  // normalization factor from A_s
+  double tnorm_correction_;  // correction factor to match CLASS normalization (default: 1.0)
 
 public:
   //! Constructor for Eisenstein & Hu fitting for transfer function
@@ -229,16 +231,44 @@ public:
     double Omega_b = cosmo_params_["Omega_b"];
 
     etf_.set_parameters(H0, Omega_m, Omega_b, Tcmb);
-    
+
     tf_distinct_ = false;
     tf_withvel_ = false;
+
+    // Hardcoded normalization correction to match CLASS when using A_s
+    // The Eisenstein & Hu fitting formula has an intrinsic normalization that doesn't
+    // match the physical A_s normalization. This factor rescales to match CLASS output.
+    const double EISENSTEIN_As_RESCALE = 8.8924137718e6;
+
+    // Optional user override (for testing different cosmologies)
+    tnorm_correction_ = pcf_->get_value_safe<double>("cosmology", "EisensteinHu_tnorm_correction", EISENSTEIN_As_RESCALE);
+
+    // Check for A_s normalization
+    if (cosmo_params_["A_s"] > 0.0) {
+        tf_isnormalised_ = true;
+        double k_p = cosmo_params_["k_p"] / cosmo_params_["h"];
+        tnorm_ = std::sqrt(2.0 * M_PI * M_PI * cosmo_params_["A_s"] *
+                          std::pow(1.0 / k_p, cosmo_params_["n_s"] - 1.0) /
+                          std::pow(2.0 * M_PI, 3.0)) * tnorm_correction_;
+        music::ilog << "Eisenstein: Using A_s=" << cosmo_params_["A_s"]
+                   << " to normalise the transfer function." << std::endl;
+        if (std::abs(tnorm_correction_ - EISENSTEIN_As_RESCALE) > 1e-6) {
+            music::ilog << "Eisenstein: Using custom normalization correction factor = "
+                       << tnorm_correction_ << std::endl;
+        }
+    } else {
+        tf_isnormalised_ = false;
+        tnorm_ = 1.0;
+        music::ilog << "Eisenstein: Using sigma_8 normalisation (computed numerically)."
+                   << std::endl;
+    }
   }
 
   //! Computes the transfer function for k in Mpc/h by calling TFfit_onek
   inline double compute(double k, tf_type type) const
   {
     if( type == theta_bc || type == delta_bc ) return 0.0;
-    return etf_.at_k(k);
+    return etf_.at_k(k) * tnorm_;
   }
 
   inline double get_kmin(void) const
@@ -264,6 +294,8 @@ protected:
   std::map<std::string, int> typemap_;
 
   eisenstein_transfer etf_;
+  double tnorm_;  // normalization factor from A_s
+  double tnorm_correction_;  // correction factor to match CLASS normalization (default: 1.0)
 
   enum wdmtyp
   {
@@ -329,12 +361,36 @@ public:
       break;
     }
     std::cerr << "WDM alpha = " << m_WDMalpha << std::endl;
+
+    // Hardcoded normalization correction to match CLASS when using A_s
+    const double EISENSTEIN_As_RESCALE = 8.8924137718e6;
+    tnorm_correction_ = pcf_->get_value_safe<double>("cosmology", "EisensteinHu_tnorm_correction", EISENSTEIN_As_RESCALE);
+
+    // Check for A_s normalization
+    if (cosmo_params_["A_s"] > 0.0) {
+        tf_isnormalised_ = true;
+        double k_p = cosmo_params_["k_p"] / cosmo_params_["h"];
+        tnorm_ = std::sqrt(2.0 * M_PI * M_PI * cosmo_params_["A_s"] *
+                          std::pow(1.0 / k_p, cosmo_params_["n_s"] - 1.0) /
+                          std::pow(2.0 * M_PI, 3.0)) * tnorm_correction_;
+        music::ilog << "Eisenstein WDM: Using A_s=" << cosmo_params_["A_s"]
+                   << " to normalise the transfer function." << std::endl;
+        if (std::abs(tnorm_correction_ - EISENSTEIN_As_RESCALE) > 1e-6) {
+            music::ilog << "Eisenstein WDM: Using custom normalization correction factor = "
+                       << tnorm_correction_ << std::endl;
+        }
+    } else {
+        tf_isnormalised_ = false;
+        tnorm_ = 1.0;
+        music::ilog << "Eisenstein WDM: Using sigma_8 normalisation (computed numerically)."
+                   << std::endl;
+    }
   }
 
   inline double compute(double k, tf_type type) const
   {
     if( type == theta_bc || type == delta_bc ) return 0.0;
-    return etf_.at_k(k) * pow(1.0 + pow(m_WDMalpha * k, 2.0 * wdmnu_), -5.0 / wdmnu_);
+    return etf_.at_k(k) * pow(1.0 + pow(m_WDMalpha * k, 2.0 * wdmnu_), -5.0 / wdmnu_) * tnorm_;
   }
 
   inline double get_kmin(void) const
@@ -354,10 +410,12 @@ class transfer_eisenstein_cdmbino_plugin : public TransferFunction_plugin
   using TransferFunction_plugin::cosmo_params_;
 
 protected:
-  
+
   real_t m_h0;
   double omegam_, H0_, omegab_, mcdm_, Tkd_, kfs_, kd_;
   eisenstein_transfer etf_;
+  double tnorm_;  // normalization factor from A_s
+  double tnorm_correction_;  // correction factor to match CLASS normalization (default: 1.0)
 
 public:
   transfer_eisenstein_cdmbino_plugin(config_file &cf, const cosmology::parameters& cp)
@@ -378,6 +436,30 @@ public:
     kd_ = 3.8e7 / m_h0 * sqrt(mcdm_ / 100. * Tkd_ / 30.);
 
     //LOGINFO(" bino CDM: k_fs = %g, k_d = %g", kfs_, kd_ );
+
+    // Hardcoded normalization correction to match CLASS when using A_s
+    const double EISENSTEIN_As_RESCALE = 8.8924137718e6;
+    tnorm_correction_ = pcf_->get_value_safe<double>("cosmology", "EisensteinHu_tnorm_correction", EISENSTEIN_As_RESCALE);
+
+    // Check for A_s normalization
+    if (cosmo_params_["A_s"] > 0.0) {
+        tf_isnormalised_ = true;
+        double k_p = cosmo_params_["k_p"] / cosmo_params_["h"];
+        tnorm_ = std::sqrt(2.0 * M_PI * M_PI * cosmo_params_["A_s"] *
+                          std::pow(1.0 / k_p, cosmo_params_["n_s"] - 1.0) /
+                          std::pow(2.0 * M_PI, 3.0)) * tnorm_correction_;
+        music::ilog << "Eisenstein CDM bino: Using A_s=" << cosmo_params_["A_s"]
+                   << " to normalise the transfer function." << std::endl;
+        if (std::abs(tnorm_correction_ - EISENSTEIN_As_RESCALE) > 1e-6) {
+            music::ilog << "Eisenstein CDM bino: Using custom normalization correction factor = "
+                       << tnorm_correction_ << std::endl;
+        }
+    } else {
+        tf_isnormalised_ = false;
+        tnorm_ = 1.0;
+        music::ilog << "Eisenstein CDM bino: Using sigma_8 normalisation (computed numerically)."
+                   << std::endl;
+    }
   }
 
   inline double compute(double k, tf_type type) const
@@ -391,7 +473,7 @@ public:
     // in principle the Green et al. (2004) works only up to k/k_fs < 1
     // the fit crosses zero at (k/k_fs)**2 = 3/2, we just zero it there...
     if (kkfs2 < 1.5)
-      return etf_.at_k(k) * (1.0 - 2.0 / 3.0 * kkfs2) * exp(-kkfs2 - kkd2);
+      return etf_.at_k(k) * (1.0 - 2.0 / 3.0 * kkfs2) * exp(-kkfs2 - kkd2) * tnorm_;
     else
       return 0.0;
   }
