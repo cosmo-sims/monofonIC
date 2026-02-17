@@ -37,12 +37,12 @@ struct grid_interpolate
   const grid_t &gridref;
   size_t nx_, ny_, nz_;
 
-  explicit grid_interpolate(const grid_t &g)
+  explicit grid_interpolate(const grid_t &g, bool update_ghosts = true)
       : gridref(g), nx_(g.n_[0]), ny_(g.n_[1]), nz_(g.n_[2])
   {
     static_assert(interpolation_order >= 0 && interpolation_order <= 2, "Interpolation order needs to be 0 (NGP), 1 (CIC), or 2 (TSC).");
 
-    if (is_distributed_trait)
+    if (is_distributed_trait && update_ghosts)
     {
       update_ghosts( g );
     }
@@ -56,6 +56,13 @@ struct grid_interpolate
     local0starts_.assign(MPI::get_size(), 0);
 
     MPI_Allgather(&local_0_start, 1, MPI_INT, &local0starts_[0], 1, MPI_INT, MPI_COMM_WORLD);
+
+    if (interpolation_order > 0 && local_0_start + interpolation_order >= static_cast<int>(g.n_[0]))
+    {
+      music::elog << "ERROR: Grid size too small for interpolation order " << interpolation_order 
+                  << " at MPI task boundary" << std::endl;
+      throw std::runtime_error("Insufficient grid size for ghost cell exchange");
+    }
 
     //... exchange boundary
     size_t nx = interpolation_order + 1;

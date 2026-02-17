@@ -1013,12 +1013,32 @@ int run( config_file& the_config )
                 
                 if( the_output_plugin->write_species_as( this_species ) == output_type::field_lagrangian )
                 {
-                    // use density simply from 1st order SPT
+                    // use density from 1st order SPT with species-dependent isocurvature correction
                     phi.FourierTransformForward();
+
+                    // First, compute the base density perturbation from white noise
+                    Grid_FFT<real_t> delta_bc({ngrid, ngrid, ngrid}, {boxlen, boxlen, boxlen});
+                    delta_bc.FourierTransformForward(false);
+                    delta_bc.assign_function_of_grids_kdep( [&]( auto k, auto wn ){
+                        return wn * the_cosmo_calc->get_amplitude_delta_bc(k.norm(), bDoLinearBCcorr);
+                    }, wnoise );
+                    delta_bc.zero_DC_mode();
+                    delta_bc.FourierTransformBackward();
+
+                    // Compute Laplacian of phi (nabla^2 phi)
                     tmp.FourierTransformForward(false);
                     tmp.assign_function_of_grids_kdep( []( auto kvec, auto pphi ){
                         return kvec.norm_squared() *  pphi;
                     }, phi);
+                    tmp.FourierTransformBackward();
+
+                    // Apply species-dependent isocurvature correction: delta = nabla^2 phi + C_species * delta_base
+                    tmp.assign_function_of_grids_r( [&]( auto laplacian_phi, auto delta_b ){
+                        return laplacian_phi + C_species * delta_b;
+                    }, tmp, delta_bc );
+
+                    // Transform to Fourier space, write power spectrum, and transform back
+                    tmp.FourierTransformForward();
                     tmp.Write_PowerSpectrum("input_powerspec_sampled_SPT.txt");
                     tmp.FourierTransformBackward();
                     the_output_plugin->write_grid_data( tmp, this_species, fluid_component::density );
