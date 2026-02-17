@@ -851,7 +851,9 @@ int run( config_file& the_config )
                                         the_output_plugin->write_species_as(this_species) == output_type::particles) ? true : false;
 
                 
-                grid_interpolate<1,Grid_FFT<real_t>> interp( tmp );
+                // generate interpolation ghost zones (needed when using glass)
+                bool update_ghosts = (lattice_type == particle::lattice_glass) ? true : false;
+                grid_interpolate<1,Grid_FFT<real_t>> interp( tmp, update_ghosts );
 
                 phi.FourierTransformForward();
                 if( LPTorder > 1 ){
