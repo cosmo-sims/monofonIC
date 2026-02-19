@@ -98,7 +98,7 @@ protected:
 
 public:
   explicit pkdgrav3_hdf5_output_plugin(config_file &cf, std::unique_ptr<cosmology::calculator> &pcc)
-      : output_plugin(cf, pcc, (std::string("PKDGRAV3-HDF5-") + typeid(write_real_t).name()).c_str())
+      : output_plugin(cf, pcc, (std::string("PKDGRAV3-HDF5 ") + typeid(write_real_t).name()).c_str())
   {
     num_files_ = 1;
 #ifdef USE_MPI
@@ -135,8 +135,7 @@ public:
     dSecUnit_ = std::sqrt(1.0 / (dGmPerCcUnit_ * GCGS));
     dKmPerSecUnit_ = std::sqrt(GCGS * dMsolUnit_ * MSOLG / (dKpcUnit_ * KPCCM)) / 1.0e5;
     dComovingGmPerCcUnit_ = dGmPerCcUnit_;
-
-    // Keep output equivalent to gadget_hdf5 -> convert_to_pkdgrav3.py.
+ 
     vunit_ = boxlen / (astart_ * dKmPerSecUnit_);
 
     blongids_ = cf_.get_value_safe<bool>("output", "UseLongids", true);
