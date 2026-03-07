@@ -32,13 +32,18 @@ private:
 
   // bool m_linbaryoninterp;
 
-  void read_table( const std::string& filename )
+  
+  bool read_table( const std::string& filename )
   {
 
     size_t nlines{0};
     // m_linbaryoninterp = false;
 
     std::vector<double> k, dc, tc, db, tb, dn, tn, dm, tm;
+    
+    // Detect file format (9 or 13 columns)
+    size_t num_columns = 0;
+    bool has_velocities = false;
 
     if( CONFIG::MPI_task_rank == 0 )
     {
@@ -50,6 +55,41 @@ private:
 
       if (!ifs.good())
         throw std::runtime_error("Could not find transfer function file \'" + filename + "\'");
+      
+      // Detect number of columns by reading first non-comment line
+      while (!ifs.eof() && num_columns == 0)
+      {
+        getline(ifs, line);
+        if (ifs.eof())
+          break;
+        if (line.find("#") != std::string::npos || line.empty())
+          continue;
+        
+        std::stringstream ss(line);
+        double val;
+        while (ss >> val)
+          num_columns++;
+      }
+      
+      ifs.clear();
+      ifs.seekg(0, std::ios::beg);
+      
+      if (num_columns == 13)
+      {
+        has_velocities = true;
+        music::ilog << "Detected 13-column CAMB format (with velocity fields)" << std::endl;
+      }
+      else if (num_columns == 9)
+      {
+        has_velocities = false;
+        music::ilog << "Detected 9-column CAMB format (old format without velocity fields)" << std::endl;
+        music::wlog << "Velocity transfer functions will be approximated from density transfer functions" << std::endl;
+      }
+      else
+      {
+        music::elog << "CAMB file has " << num_columns << " columns, expected 9 or 13" << std::endl;
+        throw std::runtime_error("CAMB transfer file has unexpected number of columns");
+      }
       
       while (!ifs.eof())
       {
@@ -65,19 +105,40 @@ private:
 
         double Tk, Tdc, Tdb, Tdn, Tdm, Tvb, Tvc, dummy;
 
-        ss >> Tk;    // k
-        ss >> Tdc;   // cdm
-        ss >> Tdb;   // baryon
-        ss >> dummy; // photon
-        ss >> dummy; // nu
-        ss >> Tdn;   // mass_nu
-        ss >> Tdm;   // total
-        ss >> dummy; // no_nu
-        ss >> dummy; // total_de
-        ss >> dummy; // Weyl
-        ss >> Tvc;   // v_cdm
-        ss >> Tvb;   // v_b
-        ss >> dummy; // v_b-v_cdm
+        if (has_velocities)
+        {
+          // 13-column format: k, CDM, baryon, photon, nu, mass_nu, total, no_nu, total_de, Weyl, v_cdm, v_b, v_b-v_cdm
+          ss >> Tk;    // k
+          ss >> Tdc;   // cdm
+          ss >> Tdb;   // baryon
+          ss >> dummy; // photon
+          ss >> dummy; // nu
+          ss >> Tdn;   // mass_nu
+          ss >> Tdm;   // total
+          ss >> dummy; // no_nu
+          ss >> dummy; // total_de
+          ss >> dummy; // Weyl
+          ss >> Tvc;   // v_cdm
+          ss >> Tvb;   // v_b
+          ss >> dummy; // v_b-v_cdm
+        }
+        else
+        {
+          // 9-column format: k, CDM, baryon, photon, nu, mass_nu, total, no_nu, total_de
+          ss >> Tk;    // k
+          ss >> Tdc;   // cdm
+          ss >> Tdb;   // baryon
+          ss >> dummy; // photon
+          ss >> dummy; // nu
+          ss >> Tdn;   // mass_nu
+          ss >> Tdm;   // total
+          ss >> dummy; // no_nu
+          ss >> dummy; // total_de
+          
+          // Approximate velocities from density (simple approximation: theta ≈ -delta)
+          Tvc = Tdc;
+          Tvb = Tdb;
+        }
 
         if (ss.bad() || ss.fail())
         {
@@ -109,7 +170,6 @@ private:
 
       // if (m_linbaryoninterp)
       //   music::ilog.Print("Using log-lin interpolation for baryons\n    (TF is not positive definite)");
-
     }
 
 #if defined(USE_MPI)
@@ -152,21 +212,44 @@ private:
     // do not use first and last value since interpolation becomes lower order
     m_kmin = k[1];
     m_kmax = k[k.size()-2];
+
+    return has_velocities;
   }
 
 public:
   transfer_CAMB_file_plugin(config_file &cf, const cosmology::parameters& cosmo_params)
       : TransferFunction_plugin(cf, cosmo_params)
   {
+    bool has_velocities = false;
+
     music::wlog << "The CAMB file plugin is not well tested! Proceed with checks of correctness of output before running a simulation!" << std::endl;
 
     std::string filename = pcf_->get_value<std::string>("cosmology", "transfer_file");
 
-    this->read_table( filename );
+    has_velocities = this->read_table( filename );
+
+    // Check if transfer function k-range is sufficient for simulation
+    const double gridres = pcf_->get_value<double>("setup", "GridRes");
+    const double boxlength = pcf_->get_value<double>("setup", "BoxLength");
+    const double k_nyquist = M_PI * gridres / boxlength * std::sqrt(3.0) * 1.2; // 1.2 safety * space diagonal Nyquist
+    
+    if (m_kmax < k_nyquist)
+    {
+      music::elog << "Transfer function file k-range is insufficient!" << std::endl;
+      music::elog << "  Required k_max (Nyquist): " << k_nyquist << " h/Mpc" << std::endl;
+      music::elog << "  Available k_max in file:  " << m_kmax << " h/Mpc" << std::endl;
+      music::elog << "  Grid resolution: " << gridres << ", Box length: " << boxlength << " Mpc/h" << std::endl;
+      music::elog << "Please provide a transfer function file with larger k-range." << std::endl;
+      throw std::runtime_error("Transfer function k-range insufficient for simulation parameters");
+    }
+    
+    music::ilog << "Transfer function k-range check: OK" << std::endl;
+    music::ilog << "  k_min = " << m_kmin << " h/Mpc, k_max = " << m_kmax << " h/Mpc" << std::endl;
+    music::ilog << "  Required k_Nyquist = " << k_nyquist << " h/Mpc" << std::endl;
 
     // set properties of this transfer function plugin:
     tf_distinct_ = true; // different density between CDM v.s. Baryon
-    tf_withvel_ = true;  // using velocity transfer function
+    tf_withvel_ = has_velocities;  // using velocity transfer function
     tf_withtotal0_ = false; // only have 1 file for the moment
   }
 
@@ -179,7 +262,9 @@ public:
   {
     // use constant interpolation on the left side of the tabulated values, i.e.
     // set values k<k_min to value at k_min! (since transfer functions asymptote to constant)
+    // also clamp to k_max to prevent interpolation errors
     k = std::max(k,m_kmin);
+    k = std::min(k,m_kmax);
 
     switch (type)
     {
