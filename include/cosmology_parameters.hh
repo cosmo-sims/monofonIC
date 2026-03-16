@@ -101,6 +101,18 @@ namespace cosmology
         explicit parameters( config_file &cf )
         {
             music::ilog << music::HRULE << std::endl;
+
+            const bool has_A_s = cf.contains_key("cosmology/A_s");
+            const bool has_sigma_8 = cf.contains_key("cosmology/sigma_8");
+            const bool wants_png = cf.get_value_safe<double>("cosmology", "fnl", 0.0) != 0.0
+                                   || cf.get_value_safe<double>("cosmology", "gnl", 0.0) != 0.0;
+
+            if (has_A_s && has_sigma_8) {
+                throw std::runtime_error("Specify only one of cosmology/A_s or cosmology/sigma_8.");
+            }
+            if (wants_png && !has_A_s) {
+                throw std::runtime_error("Primordial non-Gaussian ICs require cosmology/A_s to be set explicitly.");
+            }
             
             if( cf.get_value_safe<std::string>("cosmology","ParameterSet","none") == std::string("none"))
             {
