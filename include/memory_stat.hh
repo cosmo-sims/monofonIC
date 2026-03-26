@@ -6,9 +6,6 @@
  */
 #pragma once
 
-namespace memory
-{
-
 #if defined(_WIN32)
 #include <windows.h>
 #include <psapi.h>
@@ -32,6 +29,9 @@ namespace memory
 #else
 #error "Cannot define getPeakRSS( ) or getCurrentRSS( ) for an unknown OS."
 #endif
+
+namespace memory
+{
 
 
 /**

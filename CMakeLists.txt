@@ -324,11 +324,6 @@ if(ENABLE_GENERICIO)
 endif()
 
 ########################################################################################################################
-# Regression tests
-enable_testing()
-add_subdirectory(tests)
-
-########################################################################################################################
 # CPU specifics
 if(APPLE)
     # prevent linking problems on recent MacOS, enable exceptions (disabled otherwise)
@@ -336,4 +331,14 @@ if(APPLE)
     set(EXE_LINKER_FLAGS "${EXE_LINKER_FLAGS} -Wl,-keep_dwarf_unwind")
     set(SHARED_LINKER_FLAGS "${SHARED_LINKER_FLAGS} -Wl,-keep_dwarf_unwind")
     set(MODULE_LINKER_FLAGS "${MODULE_LINKER_FLAGS} -Wl,-keep_dwarf_unwind")
+    # macOS 26 SDK uses _Static_assert (C11) in mach/bsm headers; GCC C++ mode
+    # does not support _Static_assert, so map it to the C++ keyword.
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        add_compile_definitions(_Static_assert=static_assert)
+    endif()
 endif()
+
+########################################################################################################################
+# Regression tests
+enable_testing()
+add_subdirectory(tests)
