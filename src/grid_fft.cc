@@ -626,11 +626,14 @@ void Grid_FFT<data_t, bdistributed>::Read_from_HDF5(const std::string Filename, 
     assert(dimsize[0] == dimsize[1] && dimsize[0] == dimsize[2]);
     music::ilog << "Read external constraint data of dimensions " << dimsize[0] << "**3." << std::endl;
 
-    for (size_t i = 0; i < 3; ++i)
-        this->n_[i] = dimsize[i];
-    this->space_ = rspace_id;
+    const std::array<size_t, 3> input_dims{
+        static_cast<size_t>(dimsize[0]),
+        static_cast<size_t>(dimsize[1]),
+        static_cast<size_t>(dimsize[2])};
 
     this->reset();
+    this->n_ = input_dims;
+    this->space_ = rspace_id;
     this->allocate();
 
     //... copy data to internal array ...
