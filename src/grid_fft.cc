@@ -1143,7 +1143,7 @@ void Grid_FFT<data_t, bdistributed>::Compute_PowerSpectrum(std::vector<double> &
            kmin = std::min(std::min(kfac_[0], kfac_[1]), kfac_[2]),
            dk = kmin;
 
-    const int nbins = kmax / kmin;
+    const int nbins = int(kmax / kmin + 0.5);
 
     bin_count.assign(nbins, 0);
     bin_k.assign(nbins, 0);
