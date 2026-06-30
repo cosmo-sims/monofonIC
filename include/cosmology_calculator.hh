@@ -18,6 +18,8 @@
 #pragma once
 
 #include <array>
+#include <algorithm>
+#include <limits>
 #include <vec.hh>
 
 #include <cosmology_parameters.hh>
@@ -33,14 +35,72 @@
 
 namespace cosmology
 {
+//! Homogeneous energy density of one massive neutrino species.
+struct neutrino_background {
+    double omega0{0.0};
+    double mass_over_temperature{0.0};
+    double rho_integral0{1.0};
+    double a_min{1.0};
+    double a_max{1.0};
+    std::unique_ptr<interpolated_function_1d<true, true, false>> density_of_a;
+
+    double density(double a) const noexcept
+    {
+        return density_of_a ? (*density_of_a)(std::clamp(a, a_min, a_max)) : 0.0;
+    }
+};
+
+//! Reduced homogeneous model used for backscaling and LPT time evolution.
+struct backscaling_background {
+    bool radiation_enabled{true};
+    bool neutrinos_enabled{true};
+    double Omega_clustering_m{0.0};
+    double Omega_r{0.0};
+    double Omega_DE{0.0};
+    double Omega_k{0.0};
+    double H0{0.0};
+    double w0{-1.0};
+    double wa{0.0};
+    std::vector<neutrino_background> neutrinos;
+
+    double Omega_mnu(double a) const noexcept
+    {
+        double result = 0.0;
+        for (const auto& nu : neutrinos) result += nu.density(a);
+        return result;
+    }
+
+    double Omega_m_of_a(double a) const noexcept
+    {
+        return Omega_clustering_m / std::pow(a, 3);
+    }
+
+    double Omega_r_of_a(double a) const noexcept
+    {
+        return Omega_r / std::pow(a, 4);
+    }
+
+    double Omega_DE_of_a(double a) const noexcept
+    {
+        return Omega_DE * std::pow(a, -3.0 * (1.0 + w0 + wa))
+             * std::exp(-3.0 * wa * (1.0 - a));
+    }
+
+    double E2(double a) const noexcept
+    {
+        return Omega_r_of_a(a)
+             + Omega_m_of_a(a)
+             + Omega_mnu(a)
+             + Omega_k / std::pow(a, 2)
+             + Omega_DE_of_a(a);
+    }
+
+    double H(double a) const noexcept { return H0 * std::sqrt(E2(a)); }
+};
+
 //! structure for ODE parameters required to evaluate RHS of ODEs
 struct ODEParams {
-    double Omega_r;
-    double Omega_m;
-    double Omega_DE;
-    double H0;
-    double w0;
-    double wa;
+    const backscaling_background* background;
 };
 
 /*!
@@ -58,13 +118,9 @@ struct ODEParams {
  */
 inline int ode_system(double t, const double y[], double dydt[], void *params) {
     ODEParams *p = static_cast<ODEParams *>(params);
-    double Omega_r  = p->Omega_r;
-    double Omega_m  = p->Omega_m;
-    double Omega_DE = p->Omega_DE;
-    
-    double w0 = p->w0;
-    double wa = p->wa;
-    double H0 = p->H0;
+    const auto& background = *p->background;
+    const double Omega_m = background.Omega_clustering_m;
+    const double H0 = background.H0;
 
     double a = y[0];
     double D = y[1];
@@ -77,7 +133,7 @@ inline int ode_system(double t, const double y[], double dydt[], void *params) {
     double Fbprime = y[8];
     // double Fc = y[9];
 
-    double H_of_a = H0 * std::sqrt(Omega_r / (a*a*a*a) + Omega_m / (a * a * a) + Omega_DE * std::pow(a, -3 * (1 + w0 + wa)) * std::exp(-3 * wa * (1 - a)));
+    const double H_of_a = background.H(a);
 
     dydt[0] = a * a * H_of_a;
     dydt[1] = Dprime;
@@ -113,11 +169,150 @@ double Dnow_, Dplus_start_, Dplus_target_, astart_, atarget_;
 
 private:
     static constexpr double REL_PRECISION = 1e-10;
+    static constexpr double BACKGROUND_A_MIN = 1e-6;
+    static constexpr double BACKGROUND_A_MAX = 1.1;
+    static constexpr std::size_t BACKGROUND_SAMPLES = 512;
     
     double m_n_s_, m_sqrtpnorm_, tnorm_;
+    backscaling_background backscaling_;
 
     //! interpolation functions of growth functions
     interpolated_function_1d<true, true, false> D_of_a_, dotD_of_a_, f_of_a_, a_of_D_, E_of_a_, dotE_of_a_, Fa_of_a_, Fb_of_a_, dotFa_of_a_, dotFb_of_a_, Fc_of_a_, dotFc_of_a_; // toma
+
+    struct neutrino_integrand_parameters {
+        double y;
+    };
+
+    static double neutrino_integrand(double q, void* raw)
+    {
+        const auto* params = static_cast<neutrino_integrand_parameters*>(raw);
+        const double epsilon = std::sqrt(q * q + params->y * params->y);
+        const double f = (q > 40.0) ? std::exp(-q) : 1.0 / (std::exp(q) + 1.0);
+        return q*q * epsilon * f;
+    }
+
+    static double integrate_Omega_mnu(double y)
+    {
+        neutrino_integrand_parameters params{y};
+        gsl_function function;
+        function.function = neutrino_integrand;
+        function.params = &params;
+        gsl_integration_workspace* workspace = gsl_integration_workspace_alloc(1000);
+        double result = 0.0, error = 0.0;
+        const auto old_handler = gsl_set_error_handler_off();
+        const int status = gsl_integration_qagiu(
+            &function, 0.0, 0.0, 1e-10, 1000, workspace, &result, &error);
+        gsl_set_error_handler(old_handler);
+        gsl_integration_workspace_free(workspace);
+        if (status != GSL_SUCCESS)
+            throw std::runtime_error("Failed to integrate massive-neutrino distribution function");
+        return result;
+    }
+
+    void initialise_backscaling_background(config_file& cf)
+    {
+        const bool has_legacy = cf.contains_key("cosmology", "ZeroRadiation");
+        const bool has_radiation = cf.contains_key("cosmology", "BackscalingRadiation");
+        const bool has_neutrinos = cf.contains_key("cosmology", "BackscalingNeutrinos");
+        if (has_legacy && (has_radiation || has_neutrinos)) {
+            music::elog << "ZeroRadiation cannot be combined with BackscalingRadiation or "
+                           "BackscalingNeutrinos." << std::endl;
+            throw std::runtime_error("Conflicting legacy and explicit backscaling options");
+        }
+
+        if (has_legacy) {
+            const bool enabled = !cf.get_value<bool>("cosmology", "ZeroRadiation");
+            backscaling_.radiation_enabled = enabled;
+            backscaling_.neutrinos_enabled = enabled;
+        } else {
+            backscaling_.radiation_enabled =
+                cf.get_value_safe<bool>("cosmology", "BackscalingRadiation", true);
+            backscaling_.neutrinos_enabled =
+                cf.get_value_safe<bool>("cosmology", "BackscalingNeutrinos", true);
+        }
+
+        backscaling_.H0 = cosmo_param_["H0"];
+        backscaling_.w0 = cosmo_param_["w_0"];
+        backscaling_.wa = cosmo_param_["w_a"];
+        backscaling_.Omega_k = 0.0;
+        backscaling_.Omega_r = backscaling_.radiation_enabled ? cosmo_param_["Omega_r"] : 0.0;
+        backscaling_.Omega_clustering_m = cosmo_param_["Omega_m"];
+
+        if (backscaling_.neutrinos_enabled && cosmo_param_["Omega_nu_massive"] > 0.0) {
+            backscaling_.Omega_clustering_m -= cosmo_param_["Omega_nu_massive"];
+            const double kTnu_eV = phys_const::kB_SI / phys_const::eV_SI
+                                 * cosmo_param_["Tcmb"] * std::pow(4.0 / 11.0, 1.0 / 3.0);
+            const std::array<double, 3> masses{
+                cosmo_param_["m_nu1"], cosmo_param_["m_nu2"], cosmo_param_["m_nu3"]};
+            const double log_min = std::log(BACKGROUND_A_MIN);
+            const double log_max = std::log(BACKGROUND_A_MAX);
+            for (const double mass : masses) {
+                if (mass <= 1e-9) continue;
+                neutrino_background nu;
+                nu.omega0 = mass / (93.14 * cosmo_param_["h"] * cosmo_param_["h"]);
+                nu.mass_over_temperature = mass / kTnu_eV;
+                nu.rho_integral0 = integrate_Omega_mnu(nu.mass_over_temperature);
+                std::vector<double> tab_a;
+                std::vector<double> tab_rho;
+                tab_a.reserve(BACKGROUND_SAMPLES);
+                tab_rho.reserve(BACKGROUND_SAMPLES);
+                for (std::size_t i = 0; i < BACKGROUND_SAMPLES; ++i) {
+                    const double log_a = log_min + (log_max - log_min) * i
+                                                   / (BACKGROUND_SAMPLES - 1);
+                    const double a = std::exp(log_a);
+                    const double y = a * nu.mass_over_temperature;
+                    tab_a.push_back(a);
+                    tab_rho.push_back(
+                        nu.omega0 * integrate_Omega_mnu(y)
+                        / nu.rho_integral0 / std::pow(a, 4));
+                }
+                nu.a_min = tab_a.front();
+                nu.a_max = tab_a.back();
+                nu.density_of_a = std::make_unique<
+                    interpolated_function_1d<true, true, false>>(tab_a, tab_rho);
+                backscaling_.neutrinos.push_back(std::move(nu));
+            }
+        }
+
+        const double omega_nu_today = backscaling_.Omega_mnu(1.0);
+        backscaling_.Omega_DE = 1.0 - backscaling_.Omega_k - backscaling_.Omega_r
+                             - backscaling_.Omega_clustering_m - omega_nu_today;
+
+        music::ilog << "Backscaling cosmological parameters are:" << std::endl;
+        music::ilog << " radiation = " << colors::CONFIG_VALUE << std::setw(16)
+                    << (backscaling_.radiation_enabled ? "enabled" : "disabled") << colors::RESET
+                    << "neutrinos = " << colors::CONFIG_VALUE << std::setw(16)
+                    << (backscaling_.neutrinos_enabled ? "enabled" : "disabled") << colors::RESET
+                    << std::endl;
+        music::ilog << " Omega_cb  = " << colors::CONFIG_VALUE << std::setw(16)
+                    << backscaling_.Omega_clustering_m << colors::RESET
+                    << "Omega_r   = " << colors::CONFIG_VALUE << std::setw(16)
+                    << backscaling_.Omega_r << colors::RESET
+                    << "Omega_nu = " << colors::CONFIG_VALUE << std::setw(16)
+                    << omega_nu_today << colors::RESET << std::endl;
+        music::ilog << " Omega_DE  = " << colors::CONFIG_VALUE << std::setw(16)
+                    << backscaling_.Omega_DE << colors::RESET
+                    << "w_0       = " << colors::CONFIG_VALUE << std::setw(16)
+                    << backscaling_.w0 << colors::RESET
+                    << "w_a      = " << colors::CONFIG_VALUE << std::setw(16)
+                    << backscaling_.wa << colors::RESET << std::endl;
+        music::ilog << "N-body evolution must use the backscaling cosmology above; "
+                       "the target cosmology\nsupplies transfer functions at ztarget."
+                    << std::endl;
+        if (backscaling_.radiation_enabled || backscaling_.neutrinos_enabled) {
+            music::ilog << " The N-body background must include the enabled ";
+            if (backscaling_.radiation_enabled)
+                music::ilog << "radiation";
+            if (backscaling_.radiation_enabled && backscaling_.neutrinos_enabled)
+                music::ilog << " and ";
+            if (backscaling_.neutrinos_enabled)
+                music::ilog << "homogeneous massive-neutrino";
+            music::ilog << " contribution"
+                        << ((backscaling_.radiation_enabled && backscaling_.neutrinos_enabled)
+                            ? "s" : "")
+                        << " to H(a)." << std::endl;
+        }
+    }
 
 
     //! wrapper for GSL adaptive integration routine, do not use if many integrations need to be done as it allocates and deallocates memory
@@ -164,16 +359,8 @@ private:
                         std::vector<double> &tab_Fc, std::vector<double> &tab_dotFc)
     {
         // using v_t = vec_t<10, double>;
-        double Omega_m = cosmo_param_["Omega_m"];
-        double Omega_r = cosmo_param_["Omega_r"];
-        double Omega_DE = cosmo_param_["Omega_DE"];
-        double H0 = cosmo_param_["H0"];
-        double w0 = cosmo_param_["w_0"];
-        double wa = cosmo_param_["w_a"];
-        
-
         // set ICs, very deep in radiation domination
-        const double a0 = 1e-6;
+        const double a0 = BACKGROUND_A_MIN;
         
         // double H_a0 = H0 * std::sqrt(Omega_m / (a0 * a0 * a0) + (1 - Omega_m));
         double H_a0 = H_of_a(a0);
@@ -204,13 +391,26 @@ private:
         gsl_odeiv2_evolve * e = gsl_odeiv2_evolve_alloc (10);
         // gsl_odeiv2_driver *d = gsl_odeiv2_driver_alloc_y_new(&sys, T, 1e-6, 0.0, 0.0);
 
-        ODEParams params = {Omega_r, Omega_m, Omega_DE, H0, w0, wa};
+        ODEParams params = {&backscaling_};
         gsl_odeiv2_system sys = {ode_system, nullptr, 10, &params};
 
         double h = 1e-6;
         double t = t0;
         double t1 = 0.1;
-        double amax = 1.1;
+        double amax = BACKGROUND_A_MAX;
+
+        tab_a.push_back(y[0]);
+        tab_D.push_back(y[1]);
+        tab_f.push_back(y[2]);
+        tab_dotD.push_back(y[2]);
+        tab_E.push_back(y[3]);
+        tab_dotE.push_back(y[4]);
+        tab_Fa.push_back(y[5]);
+        tab_dotFa.push_back(y[6]);
+        tab_Fb.push_back(y[7]);
+        tab_dotFb.push_back(y[8]);
+        tab_Fc.push_back(y[9]);
+        tab_dotFc.push_back(0.0);
 
         while (y[0] < amax) {
             
@@ -239,46 +439,67 @@ private:
         gsl_odeiv2_control_free (c);
         gsl_odeiv2_step_free (s);
         
-        if (CONFIG::MPI_task_rank == 0)
+        // Convert the temporary D' table to f and complete dot(Fc).
+        for (size_t i = 0; i < tab_a.size(); ++i)
         {
-            // output growth factors to file for debugging
-            std::ofstream output_file;
-            output_file.open("GrowthFactors.txt");
-            // compute f, before we stored here D'
-            output_file << "#"
-                        << "a"
-                        << " "
-                        << "D"
-                        << " "
-                        << "f"
-                        << " "
-                        << "E"
-                        << " "
-                        << "dotE"
-                        << " "
-                        << "Fa"
-                        << " "
-                        << "dotFa"
-                        << " "
-                        << "Fb"
-                        << " "
-                        << "dotFb"
-                        << " "
-                        << "Fc"
-                        << " "
-                        << "dotFc"
-                        << "\n";
-            for (size_t i = 0; i < tab_a.size(); ++i)
-            {
-
-                tab_dotFc[i] = (tab_D[i] * tab_dotE[i] - tab_E[i] * tab_f[i]); // toma
-                tab_f[i] = tab_f[i] / (tab_a[i] * H_of_a(tab_a[i]) * tab_D[i]);
-
-                // toma
-                output_file << tab_a[i] << " " << tab_D[i] << " " << tab_dotD[i] << " " << tab_E[i] << " " << tab_dotE[i] << " " << tab_Fa[i] << " " << tab_dotFa[i] << " " << tab_Fb[i] << " " << tab_dotFb[i] << " " << tab_Fc[i] << " " << tab_dotFc[i] << "\n";
-            }
-            output_file.close();
+            tab_dotFc[i] = tab_D[i] * tab_dotE[i] - tab_E[i] * tab_f[i];
+            tab_f[i] = tab_f[i] / (tab_a[i] * H_of_a(tab_a[i]) * tab_D[i]);
         }
+    }
+
+    void write_backscaling_diagnostics(config_file& cf) const
+    {
+        if (!cf.get_value_safe<bool>("execution", "WriteBackscalingDiagnostics", false)
+            || CONFIG::MPI_task_rank != 0)
+            return;
+
+        constexpr std::size_t sample_count = 256;
+        std::vector<double> samples;
+        samples.reserve(sample_count + 3);
+        const double log_min = std::log(BACKGROUND_A_MIN);
+        for (std::size_t i = 0; i < sample_count; ++i)
+            samples.push_back(std::exp(log_min * (sample_count - 1 - i)
+                                      / (sample_count - 1)));
+        samples.push_back(astart_);
+        samples.push_back(atarget_);
+        samples.push_back(1.0);
+        std::sort(samples.begin(), samples.end());
+        samples.erase(std::unique(samples.begin(), samples.end(),
+            [](double lhs, double rhs) {
+                return std::abs(lhs - rhs)
+                     <= 16.0 * std::numeric_limits<double>::epsilon()
+                        * std::max(std::abs(lhs), std::abs(rhs));
+            }), samples.end());
+
+        const std::string filename = cf.get_path_relative_to_config("backscaling.txt");
+        std::ofstream output(filename);
+        if (!output)
+            throw std::runtime_error("Could not write backscaling diagnostics to '" + filename + "'");
+
+        output << "# BackscalingRadiation=" << std::boolalpha
+               << backscaling_.radiation_enabled
+               << " BackscalingNeutrinos=" << backscaling_.neutrinos_enabled << "\n"
+               << "# target_Omega_m=" << cosmo_param_["Omega_m"]
+               << " target_Omega_r=" << cosmo_param_["Omega_r"]
+               << " target_Omega_nu_massive=" << cosmo_param_["Omega_nu_massive"]
+               << " target_Omega_DE=" << cosmo_param_["Omega_DE"] << "\n"
+               << "# a z H_over_H0 matter radiation neutrino dark_energy"
+                  " D1 f1 D2 D3a D3b D3c\n";
+        output << std::scientific << std::setprecision(16);
+        for (const double a : samples) {
+            output << a << " " << 1.0 / a - 1.0 << " "
+                   << H_of_a(a) / backscaling_.H0 << " "
+                   << backscaling_.Omega_m_of_a(a) << " "
+                   << backscaling_.Omega_r_of_a(a) << " "
+                   << backscaling_.Omega_mnu(a) << " "
+                   << backscaling_.Omega_DE_of_a(a) << " "
+                   << get_growth_factor(a) << " " << get_f(a) << " "
+                   << get_2growth_factor(a) << " "
+                   << get_3growthA_factor(a) << " "
+                   << get_3growthB_factor(a) << " "
+                   << get_3growthC_factor(a) << "\n";
+        }
+        music::ilog << "Wrote backscaling diagnostics to '" << filename << "'" << std::endl;
     }
 
 public:
@@ -298,6 +519,7 @@ public:
         : cosmo_param_(cf), astart_( 1.0/(1.0+cf.get_value<double>("setup","zstart")) ),
             atarget_( 1.0/(1.0+cf.get_value_safe<double>("cosmology","ztarget",0.0)) )
     {
+        this->initialise_backscaling_background(cf);
         // pre-compute growth factors and store for interpolation
         std::vector<double> tab_a, tab_D, tab_dotD, tab_f, tab_E, tab_dotE, tab_Fa, tab_dotFa, tab_Fb, tab_dotFb, tab_Fc, tab_dotFc;   // toma
         this->compute_growth(tab_a, tab_D, tab_dotD, tab_f, tab_E, tab_dotE, tab_Fa, tab_dotFa, tab_Fb, tab_dotFb, tab_Fc, tab_dotFc); // toma
@@ -323,6 +545,7 @@ public:
         Dplus_target_ = D_of_a_(atarget_) / Dnow_;
 
         music::ilog << "Linear growth factors: D+_target = " << colors::CONFIG_VALUE << Dplus_target_ << colors::RESET << ", D+_start = " << colors::CONFIG_VALUE << Dplus_start_ << colors::RESET << std::endl;
+        this->write_backscaling_diagnostics(cf);
 
         // set up transfer functions and compute normalisation
         transfer_function_ = std::move(select_TransferFunction_plugin(cf, cosmo_param_));
@@ -482,12 +705,12 @@ public:
     /// @return H(a)
     inline double H_of_a(double a) const noexcept
     {
-        double HH2 = 0.0;
-        HH2 += cosmo_param_["Omega_r"] / (a * a * a * a);
-        HH2 += cosmo_param_["Omega_m"] / (a * a * a);
-        HH2 += cosmo_param_["Omega_k"] / (a * a);
-        HH2 += cosmo_param_["Omega_DE"] * std::pow(a, -3. * (1. + cosmo_param_["w_0"] + cosmo_param_["w_a"])) * exp(-3. * (1.0 - a) * cosmo_param_["w_a"]);
-        return cosmo_param_["H0"] * std::sqrt(HH2);
+        return backscaling_.H(a);
+    }
+
+    double get_backscaling_Omega_mnu(double a) const noexcept
+    {
+        return backscaling_.Omega_mnu(a);
     }
 
     /// @brief Computes the linear theory growth factor D+, normalised to D+(a=1)=1

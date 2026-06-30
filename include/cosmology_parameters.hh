@@ -253,11 +253,6 @@ namespace cosmology
             // compute amount of cold dark matter as the rest
             pmap_["Omega_c"] = this->get("Omega_m") - this->get("Omega_b") - this->get("Omega_nu_massive");
 
-            if (cf.get_value_safe<bool>("cosmology", "ZeroRadiation", false))
-            {
-                pmap_["Omega_r"] = 0.0;
-            }
-
             pmap_["f_b"] = this->get("Omega_b") / this->get("Omega_m");
             pmap_["f_c"] = 1.0 - this->get("f_b"); // this means we add massive neutrinos to CDM here
 
@@ -287,12 +282,6 @@ namespace cosmology
             music::ilog << " Omega_r  = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_r") << colors::RESET << "Omega_nu = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_nu_massive") << colors::RESET << "∑m_nu   = " << colors::CONFIG_VALUE << sum_m_nu << colors::RESET << "eV" << std::endl;
             music::ilog << " Omega_DE = " << colors::CONFIG_VALUE << std::setw(16) << this->get("Omega_DE") << colors::RESET << "w_0      = " << colors::CONFIG_VALUE << std::setw(16) << this->get("w_0") << colors::RESET << "w_a     = " << colors::CONFIG_VALUE << std::setw(16) << this->get("w_a") << colors::RESET << std::endl;
             //music::ilog << " Omega_k  = " << 1.0 - this->get("Omega_m") - this->get("Omega_r") - this->get("Omega_DE") << std::endl;
-            if (this->get("Omega_r") > 0.0)
-            {
-                music::wlog << " Radiation enabled, using Omega_r=" << this->get("Omega_r") << " internally for backscaling." << std::endl;
-                music::wlog << " Make sure your sim code supports this, otherwise set [cosmology] / ZeroRadiation=true." << std::endl;
-            }
-
             //--------------------------------------------------------------------------------
             // other parameters
             //--------------------------------------------------------------------------------
