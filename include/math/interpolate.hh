@@ -17,6 +17,9 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
 #include <vector>
 #include <cassert>
 #include <gsl/gsl_spline.h>
@@ -33,7 +36,7 @@ class interpolated_function_1d
 
 private:
 
-  double min_val_ = 0. ; ///< minimum value of y (subtracted and then readded to avoid numerical issues) : TOMA
+  double y_sign_ = 1.0; ///< common sign restored after logarithmic-y interpolation
   bool isinit_; ///< flag to indicate whether the interpolation has been initialized
   std::vector<double> data_x_, data_y_; ///< data vectors
   gsl_interp_accel *gsl_ia_; ///< GSL interpolation accelerator
@@ -75,23 +78,34 @@ public:
   /// @param data_y y data vector
   void set_data(const std::vector<double> &data_x, const std::vector<double> &data_y)
   {
-    // TOMA
-    min_val_ = *std::min_element(data_y.begin(), data_y.end()) -1.0;
-
     data_x_ = data_x;
     data_y_ = data_y;
 
-    for (size_t i=0; i< data_y.size(); i++) //TOMA
-    {
-        data_y_[i] = data_y_[i] - min_val_;
-    }
-
-    
     assert(data_x_.size() == data_y_.size());
     assert(data_x_.size() > 5);
 
-    if (logx) for (auto &d : data_x_) d = std::log(d);
-    if (logy) for (auto &d : data_y_) d = std::log(d);
+    if (logx) {
+      for (auto &d : data_x_) {
+        if (!std::isfinite(d) || d <= 0.0)
+          throw std::invalid_argument("Log-x interpolation requires finite, positive data");
+        d = std::log(d);
+      }
+    }
+
+    if (logy) {
+      if (!std::isfinite(data_y_.front()) || data_y_.front() == 0.0)
+        throw std::invalid_argument("Log-y interpolation requires finite, nonzero data");
+
+      y_sign_ = std::signbit(data_y_.front()) ? -1.0 : 1.0;
+      for (auto &d : data_y_) {
+        if (!std::isfinite(d) || d == 0.0)
+          throw std::invalid_argument("Log-y interpolation requires finite, nonzero data");
+        const double sign = std::signbit(d) ? -1.0 : 1.0;
+        if (sign != y_sign_)
+          throw std::invalid_argument("Log-y interpolation requires data with a constant sign");
+        d = std::log(std::abs(d));
+      }
+    }
 
     if (isinit_) this->deallocate();
 
@@ -110,7 +124,6 @@ public:
     assert( isinit_ && !(logx&&x<=0.0) );
     const double xa = logx ? std::log(x) : x;
     const double y(gsl_spline_eval(gsl_sp_, xa, gsl_ia_));
-    return logy ? std::exp(y) + min_val_ : y + min_val_;
-    //return logy ? std::exp(y) : y;
+    return logy ? y_sign_ * std::exp(y) : y;
   }
 };
