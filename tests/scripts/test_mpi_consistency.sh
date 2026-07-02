@@ -54,10 +54,18 @@ for NTASKS in "${MPI_TASKS[@]}"; do
     # Run monofonIC with specified number of MPI tasks
     if [ "$NTASKS" -eq 1 ]; then
         # Single task - run without mpirun
-        "$MONOFONIC_EXE" "$CONFIG_FILE" > "${TEMP_DIR}/log_np${NTASKS}.txt" 2>&1
+        if ! "$MONOFONIC_EXE" "$CONFIG_FILE" > "${TEMP_DIR}/log_np${NTASKS}.txt" 2>&1; then
+            echo "Error: monofonIC failed with $NTASKS task"
+            cat "${TEMP_DIR}/log_np${NTASKS}.txt"
+            exit 1
+        fi
     else
         # Multiple tasks - use mpirun with --oversubscribe for CI environments with limited cores
-        mpirun --oversubscribe -np "$NTASKS" "$MONOFONIC_EXE" "$CONFIG_FILE" > "${TEMP_DIR}/log_np${NTASKS}.txt" 2>&1
+        if ! mpirun --oversubscribe -np "$NTASKS" "$MONOFONIC_EXE" "$CONFIG_FILE" > "${TEMP_DIR}/log_np${NTASKS}.txt" 2>&1; then
+            echo "Error: monofonIC failed under mpirun with $NTASKS tasks"
+            cat "${TEMP_DIR}/log_np${NTASKS}.txt"
+            exit 1
+        fi
     fi
 
     # Check that output was created (single file or multi-file format)
