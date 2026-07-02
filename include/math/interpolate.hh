@@ -24,6 +24,7 @@
 #include <cassert>
 #include <gsl/gsl_spline.h>
 #include <gsl/gsl_errno.h>
+#include <logger.hh>
 
 
 /// @brief 1D interpolation class
@@ -37,6 +38,7 @@ class interpolated_function_1d
 private:
 
   double y_sign_ = 1.0; ///< common sign restored after logarithmic-y interpolation
+  bool use_log_y_ = logy; ///< whether logarithmic-y interpolation is active for the current data
   bool isinit_; ///< flag to indicate whether the interpolation has been initialized
   std::vector<double> data_x_, data_y_; ///< data vectors
   gsl_interp_accel *gsl_ia_; ///< GSL interpolation accelerator
@@ -86,24 +88,40 @@ public:
 
     if (logx) {
       for (auto &d : data_x_) {
-        if (!std::isfinite(d) || d <= 0.0)
+        if (!std::isfinite(d) || d <= 0.0) {
+          music::elog << "Log-x interpolation requires finite, positive data." << std::endl;
           throw std::invalid_argument("Log-x interpolation requires finite, positive data");
+        }
         d = std::log(d);
       }
     }
 
     if (logy) {
-      if (!std::isfinite(data_y_.front()) || data_y_.front() == 0.0)
-        throw std::invalid_argument("Log-y interpolation requires finite, nonzero data");
+      bool has_positive = false;
+      bool has_negative = false;
+      bool has_zero = false;
 
-      y_sign_ = std::signbit(data_y_.front()) ? -1.0 : 1.0;
-      for (auto &d : data_y_) {
-        if (!std::isfinite(d) || d == 0.0)
-          throw std::invalid_argument("Log-y interpolation requires finite, nonzero data");
-        const double sign = std::signbit(d) ? -1.0 : 1.0;
-        if (sign != y_sign_)
-          throw std::invalid_argument("Log-y interpolation requires data with a constant sign");
-        d = std::log(std::abs(d));
+      for (const auto d : data_y_) {
+        if (!std::isfinite(d)) {
+          music::elog << "Log-y interpolation requires finite data." << std::endl;
+          throw std::invalid_argument("Log-y interpolation requires finite data");
+        }
+        has_positive |= d > 0.0;
+        has_negative |= d < 0.0;
+        has_zero |= d == 0.0;
+      }
+
+      use_log_y_ = !has_zero && !(has_positive && has_negative);
+      if (use_log_y_) {
+        y_sign_ = has_negative ? -1.0 : 1.0;
+        for (auto &d : data_y_)
+          d = std::log(std::abs(d));
+      } else {
+        y_sign_ = 1.0;
+        music::wlog
+          << "Log-y interpolation received data that is not strictly single-signed; "
+             "falling back to linear-y interpolation."
+          << std::endl;
       }
     }
 
@@ -124,6 +142,6 @@ public:
     assert( isinit_ && !(logx&&x<=0.0) );
     const double xa = logx ? std::log(x) : x;
     const double y(gsl_spline_eval(gsl_sp_, xa, gsl_ia_));
-    return logy ? y_sign_ * std::exp(y) : y;
+    return use_log_y_ ? y_sign_ * std::exp(y) : y;
   }
 };
