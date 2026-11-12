@@ -206,7 +206,8 @@ private:
     double wtime = get_wtime();
 
     //.........................................................................
-    this->setup_class( pars_ );
+    if (this->setup_class( pars_ ) == _FAILURE_)
+      throw std::runtime_error("CLASS failed to initialise, see the CLASS error message above.");
     //.........................................................................
 
     wtime = get_wtime() - wtime;
@@ -389,14 +390,18 @@ private:
     //transform redshift in conformal time
     double tau;
     int index;
-    background_tau_of_z(&ba_,z,&tau);
+    if (background_tau_of_z(&ba_,z,&tau) == _FAILURE_)
+      throw std::runtime_error(std::string("CLASS background_tau_of_z failed: ") + ba_.error_message);
     if(std::log(tau) < pt_.ln_tau[0]){
       music::elog << "Asking sources at a z bigger than z_max_pk, something probably went wrong\n";
       throw std::runtime_error(pt_.error_message);
     }
 
     double *pvecback=new double[ba_.bg_size];
-    background_at_tau(&ba_,tau,long_info,inter_normal, &index, pvecback);
+    if (background_at_tau(&ba_,tau,long_info,inter_normal, &index, pvecback) == _FAILURE_){
+      delete[] pvecback;
+      throw std::runtime_error(std::string("CLASS background_at_tau failed: ") + ba_.error_message);
+    }
     // fHa = f * a' = f * a * Hcal
     double fHa = pvecback[ba_.index_bg_f] * (pvecback[ba_.index_bg_a]*pvecback[ba_.index_bg_H]);
     // correction factor for total matter perturbations in case of non-clustering dark energy fluid
