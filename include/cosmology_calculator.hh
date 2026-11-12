@@ -355,11 +355,21 @@ public:
         transfer_function_ = std::move(select_TransferFunction_plugin(cf, cosmo_param_));
         transfer_function_->intialise();
         if( !transfer_function_->tf_isnormalised_ ){
+            if( cosmo_param_["sigma_8"] <= 0.0 ){
+                throw std::runtime_error("Transfer function plugin '" + cf.get_value<std::string>("cosmology", "transfer")
+                    + "' cannot be normalised with A_s: set cosmology/sigma_8 instead.");
+            }
             cosmo_param_.set("pnorm", this->compute_pnorm_from_sigma8() );
         }else{
-            cosmo_param_.set("pnorm", 1.0/Dplus_target_/Dplus_target_);
-            auto sigma8 = this->compute_sigma8();
-            music::ilog << "Measured sigma_8 for given PS normalisation is " << colors::CONFIG_VALUE << sigma8 << colors::RESET << std::endl;
+            if( transfer_function_->tf_per_unit_growth_ ){
+                // transfer function is given per unit growth factor (D = a in matter domination): scale to z = 0
+                cosmo_param_.set("pnorm", Dnow_*Dnow_);
+            }else{
+                // transfer function is given at ztarget: scale to z = 0
+                cosmo_param_.set("pnorm", 1.0/Dplus_target_/Dplus_target_);
+            }
+            auto sigma8 = this->compute_sigma8() * std::sqrt(cosmo_param_["pnorm"]);
+            music::ilog << "Measured sigma_8 (z=0) for given PS normalisation is " << colors::CONFIG_VALUE << sigma8 << colors::RESET << std::endl;
         }
         cosmo_param_.set("sqrtpnorm", std::sqrt(cosmo_param_["pnorm"]));
 
