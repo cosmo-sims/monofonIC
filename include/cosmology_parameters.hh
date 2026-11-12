@@ -116,6 +116,10 @@ namespace cosmology
             if (wants_png && !has_A_s) {
                 throw std::runtime_error("Primordial non-Gaussian ICs require cosmology/A_s to be set explicitly.");
             }
+            if (wants_png && cf.get_value_safe<double>("cosmology", "nf", 0.0) != 0.0
+                && cf.get_value_safe<double>("cosmology", "k0", 0.0) <= 0.0) {
+                throw std::runtime_error("Scale-dependent non-Gaussianity (cosmology/nf != 0) requires cosmology/k0 > 0.");
+            }
             
             if( cf.get_value_safe<std::string>("cosmology","ParameterSet","none") == std::string("none"))
             {
