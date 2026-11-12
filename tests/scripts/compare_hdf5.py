@@ -107,6 +107,8 @@ def compare_attributes(attrs1, attrs2, name):
         'CLASS Revision',    # CLASS version, may differ
         'CLASS Tag',
         'config_basepath',   # Absolute path of the config file
+        'MPI Ranks',         # Parallel layout, differs in MPI consistency tests
+        'Threads',
     }
 
     # Check all keys present in both
