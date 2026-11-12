@@ -859,7 +859,13 @@ int run( config_file& the_config )
                                         the_output_plugin->write_species_as(this_species) == output_type::particles) ? true : false;
 
                 
-                grid_interpolate<1,Grid_FFT<real_t>> interp( tmp );
+                // The interpolator is only needed for the glass compensation kernel.
+                // Building it allocates and exchanges ghost slabs, so skip it for
+                // all other particle loads
+                std::unique_ptr<grid_interpolate<1,Grid_FFT<real_t>>> interp;
+                if( lattice_type == particle::lattice_glass ){
+                    interp = std::make_unique<grid_interpolate<1,Grid_FFT<real_t>>>( tmp );
+                }
 
                 phi.FourierTransformForward();
                 if( LPTorder > 1 ){
@@ -919,7 +925,7 @@ int run( config_file& the_config )
                                 }
 
                                 if( the_output_plugin->write_species_as( this_species ) == output_type::particles && lattice_type == particle::lattice_glass){
-                                    tmp.kelem(idx) *= interp.compensation_kernel( tmp.get_k<real_t>(i,j,k) ) ;
+                                    tmp.kelem(idx) *= interp->compensation_kernel( tmp.get_k<real_t>(i,j,k) ) ;
                                 }
 
                                 // divide by Lbox, because displacement is in box units for output plugin
@@ -982,7 +988,7 @@ int run( config_file& the_config )
 
                                 // correct with interpolation kernel if we used interpolation to read out the positions (for glasses)
                                 if( the_output_plugin->write_species_as( this_species ) == output_type::particles && lattice_type == particle::lattice_glass){
-                                    tmp.kelem(idx) *= interp.compensation_kernel( tmp.get_k<real_t>(i,j,k) );
+                                    tmp.kelem(idx) *= interp->compensation_kernel( tmp.get_k<real_t>(i,j,k) );
                                 }
 
                                 // correct velocity with PLT mode growth rate
