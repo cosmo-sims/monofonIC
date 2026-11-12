@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
+#include <limits>
 #include <math/vec3.hh>
 #include <grid_ghosts.hh>
 #include <grid_interpolate.hh>
@@ -113,6 +114,17 @@ namespace particle
         }
 
         public:
+        //! stop if the largest particle ID does not fit into 32 bits but 32-bit IDs are written
+        static void check_id_range(const bool b64ids, const size_t max_id)
+        {
+            if (!b64ids && max_id > size_t(std::numeric_limits<uint32_t>::max()))
+            {
+                music::elog << "Particle IDs up to " << max_id << " do not fit into 32 bits. "
+                            << "Set UseLongids = true in [output]." << std::endl;
+                abort();
+            }
+        }
+
         /**
          * @brief Construct a new lattice generator object
          * 
@@ -146,6 +158,7 @@ namespace particle
                 // set particle IDs to the Lagrangian coordinate (1D encoded) with additionally the field shift encoded as well
 
                 IDoffset = IDoffset * overload * field.global_size();
+                check_id_range(b64ids, IDoffset + overload * field.global_size() - 1);
 
                 for (size_t i = 0, ipcount = 0; i < field.rsize(0); ++i)
                 {
@@ -234,6 +247,7 @@ namespace particle
 
                 // set particle IDs to the Lagrangian coordinate (1D encoded) with additionally the field shift encoded as well
                 IDoffset = IDoffset * field.global_size();
+                check_id_range(b64ids, IDoffset + field.global_size() - 1);
 
                 for (size_t i = 0, ipcount = 0; i < field.rsize(0); ++i)
                 {
@@ -269,6 +283,7 @@ namespace particle
 #else
                 global_num_particles_ = glass_ptr_->size();
 #endif
+                check_id_range(b64ids, IDoffset + global_num_particles_ - 1);
 
                 #pragma omp parallel for
                 for (size_t i = 0; i < glass_ptr_->size(); ++i)
