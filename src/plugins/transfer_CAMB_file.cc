@@ -29,6 +29,7 @@ private:
   interpolated_function_1d<true, true, false> delta_c_, delta_b_, delta_n_, delta_m_, theta_c_, theta_b_, theta_n_, theta_m_;
 
   double m_kmin, m_kmax;
+  double m_ktab_max; //!< largest tabulated k; the spline cannot be evaluated beyond it
 
   // bool m_linbaryoninterp;
 
@@ -152,6 +153,7 @@ private:
     // do not use first and last value since interpolation becomes lower order
     m_kmin = k[1];
     m_kmax = k[k.size()-2];
+    m_ktab_max = k.back();
   }
 
 public:
@@ -180,6 +182,10 @@ public:
     // use constant interpolation on the left side of the tabulated values, i.e.
     // set values k<k_min to value at k_min! (since transfer functions asymptote to constant)
     k = std::max(k,m_kmin);
+
+    // beyond the table the spline would abort (GSL domain error): return zero there, as the CLASS plugin does
+    // outside its k range; the calculator already warns if the grid needs k beyond get_kmax()
+    if (k > m_ktab_max) return 0.0;
 
     switch (type)
     {

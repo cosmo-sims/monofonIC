@@ -53,8 +53,10 @@ struct grid_with_ghosts
   int get_task(ptrdiff_t index) const
   {
     int itask = 0;
+#if defined(USE_MPI)
     while (itask < MPI::get_size() - 1 && offsets_[itask + 1] <= index)
         ++itask;
+#endif
     return itask;
   }
 
@@ -63,6 +65,7 @@ struct grid_with_ghosts
   explicit grid_with_ghosts(const grid_t &g)
   : gridref(g), nx_(g.n_[0]), ny_(g.n_[1]), nz_(g.n_[2]), nzp_(g.n_[2]+2)
   {
+#if defined(USE_MPI)
     if (is_distributed_trait)
     {
       int ntasks(MPI::get_size());
@@ -81,6 +84,7 @@ struct grid_with_ghosts
 
       update_ghosts_allow_multiple( g );
     }
+#endif
   }
 
   /// @brief update ghost zones via MPI communication

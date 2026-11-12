@@ -206,7 +206,8 @@ private:
     double wtime = get_wtime();
 
     //.........................................................................
-    this->setup_class( pars_ );
+    if (this->setup_class( pars_ ) == _FAILURE_)
+      throw std::runtime_error("CLASS failed to initialise, see the CLASS error message above.");
     //.........................................................................
 
     wtime = get_wtime() - wtime;
@@ -389,18 +390,29 @@ private:
     //transform redshift in conformal time
     double tau;
     int index;
-    background_tau_of_z(&ba_,z,&tau);
+    if (background_tau_of_z(&ba_,z,&tau) == _FAILURE_)
+      throw std::runtime_error(std::string("CLASS background_tau_of_z failed: ") + ba_.error_message);
     if(std::log(tau) < pt_.ln_tau[0]){
       music::elog << "Asking sources at a z bigger than z_max_pk, something probably went wrong\n";
       throw std::runtime_error(pt_.error_message);
     }
 
     double *pvecback=new double[ba_.bg_size];
-    background_at_tau(&ba_,tau,long_info,inter_normal, &index, pvecback);
+    if (background_at_tau(&ba_,tau,long_info,inter_normal, &index, pvecback) == _FAILURE_){
+      delete[] pvecback;
+      throw std::runtime_error(std::string("CLASS background_at_tau failed: ") + ba_.error_message);
+    }
     // fHa = f * a' = f * a * Hcal
     double fHa = pvecback[ba_.index_bg_f] * (pvecback[ba_.index_bg_a]*pvecback[ba_.index_bg_H]);
     // correction factor for total matter perturbations in case of non-clustering dark energy fluid
     double fac_tot = pvecback[ba_.index_bg_rho_tot] / (pvecback[ba_.index_bg_rho_tot] - pvecback[ba_.index_bg_rho_fld]);
+    // background weights for theta_m, theta_cb, delta_cb when CLASS does not store them (see below)
+    const double rho_b = pvecback[ba_.index_bg_rho_b];
+    const double rho_c = (ba_.has_cdm == _TRUE_) ? pvecback[ba_.index_bg_rho_cdm] : 0.0;
+    std::vector<double> rho_plus_p_ncdm;
+    if (ba_.has_ncdm == _TRUE_)
+      for (int n = 0; n < ba_.N_ncdm; ++n)
+        rho_plus_p_ncdm.push_back(pvecback[ba_.index_bg_rho_ncdm1 + n] + pvecback[ba_.index_bg_p_ncdm1 + n]);
     delete[] pvecback;
 
     //...
@@ -424,17 +436,47 @@ private:
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_b, tau, &d_b[0]);
     call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_b, tau, &t_b[0]);
     
-    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_ncdm1, tau, &d_ncdm[0]);
-    call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_ncdm1, tau, &t_ncdm[0]);
+    // CLASS assigns a source index only when it stores that source (class_define_index); the other index_tp_*
+    // members of pt_ stay uninitialised and must not be used. theta_m and theta_cb are stored only for number
+    // counts with RSD, the ncdm sources and delta_cb only with massive neutrinos. Missing ones are built from the
+    // species as CLASS does (perturbations.c: (rho+p)-weighted mean; theta_cdm = 0 in the synchronous gauge).
+    const size_t nk = pt_.k_size[index_md];
+    std::vector<std::vector<double>> t_ncdm_n;
+    if (ba_.has_ncdm == _TRUE_) {
+      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_ncdm1, tau, &d_ncdm[0]);
+      call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_ncdm1, tau, &t_ncdm[0]);
+      for (int n = 0; n < ba_.N_ncdm; ++n) {
+        t_ncdm_n.emplace_back(nk, 0.0);
+        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_ncdm1 + n, tau, &t_ncdm_n[n][0]);
+      }
+    }
+    auto theta_weighted = [&](bool with_ncdm) {
+      double den = rho_b + rho_c;
+      if (with_ncdm) for (double w : rho_plus_p_ncdm) den += w;
+      for (size_t i = 0; i < nk; ++i) {
+        double num = rho_b * t_b[i];
+        if (with_ncdm) for (size_t n = 0; n < t_ncdm_n.size(); ++n) num += rho_plus_p_ncdm[n] * t_ncdm_n[n][i];
+        t_tot[i] = num / den;
+      }
+    };
 
     switch( total_type_ ){
       case cosmology::MATTER_ :
         call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_m, tau, &d_tot[0]);
-        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_m, tau, &t_tot[0]);
+        if (pt_.has_source_theta_m == _TRUE_)
+          call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_m, tau, &t_tot[0]);
+        else
+          theta_weighted(true);
         break;
       case cosmology::BPLUSC_ :
-        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cb, tau, &d_tot[0]);
-        call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_cb, tau, &t_tot[0]);
+        if (pt_.has_source_delta_cb == _TRUE_)
+          call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_cb, tau, &d_tot[0]);
+        else
+          for (size_t i = 0; i < nk; ++i) d_tot[i] = (rho_b * d_b[i] + rho_c * d_cdm[i]) / (rho_b + rho_c);
+        if (pt_.has_source_theta_cb == _TRUE_)
+          call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_theta_cb, tau, &t_tot[0]);
+        else
+          theta_weighted(false);
         break;
       case cosmology::TOTAL_ :
         call_perturb_sources_at_tau(index_md, 0, pt_.index_tp_delta_tot, tau, &d_tot[0]);

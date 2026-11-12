@@ -81,7 +81,7 @@ def compare_datasets(dataset1, dataset2, name, rtol=1e-10, atol=1e-14):
         return True, ""
 
 
-def compare_attributes(attrs1, attrs2, name):
+def compare_attributes(attrs1, attrs2, name, rtol=1e-9, atol=1e-14):
     """
     Compare attributes of two HDF5 objects.
 
@@ -89,6 +89,8 @@ def compare_attributes(attrs1, attrs2, name):
         attrs1: First attribute dict
         attrs2: Second attribute dict
         name: Name of the object (for error reporting)
+        rtol: Relative tolerance for floating-point attributes
+        atol: Absolute tolerance for floating-point attributes
 
     Returns:
         (bool, str): (True if match, error message if no match)
@@ -107,6 +109,8 @@ def compare_attributes(attrs1, attrs2, name):
         'CLASS Revision',    # CLASS version, may differ
         'CLASS Tag',
         'config_basepath',   # Absolute path of the config file
+        'MPI Ranks',         # Parallel layout, differs in MPI consistency tests
+        'Threads',
     }
 
     # Check all keys present in both
@@ -145,7 +149,12 @@ def compare_attributes(attrs1, attrs2, name):
         if val1.dtype != val2.dtype:
             return False, f"Attribute '{key}' dtype mismatch: {val1.dtype} vs {val2.dtype}"
 
-        if not np.array_equal(val1, val2):
+        # Floating-point attributes are computed values (e.g. sigma_8), which
+        # differ in the last bits between platforms: use the dataset tolerance
+        if np.issubdtype(val1.dtype, np.floating):
+            if val1.shape != val2.shape or not np.allclose(val1, val2, rtol=rtol, atol=atol):
+                return False, f"Attribute '{key}' value mismatch: {val1} vs {val2}"
+        elif not np.array_equal(val1, val2):
             return False, f"Attribute '{key}' value mismatch: {val1} vs {val2}"
 
     return True, ""
@@ -169,7 +178,7 @@ def compare_groups_recursive(group1, group2, path="/", rtol=1e-9, atol=1e-14, ve
     errors = []
 
     # Compare attributes
-    match, msg = compare_attributes(group1.attrs, group2.attrs, path)
+    match, msg = compare_attributes(group1.attrs, group2.attrs, path, rtol, atol)
     if not match:
         errors.append(f"{path} [attributes]: {msg}")
 
@@ -211,7 +220,7 @@ def compare_groups_recursive(group1, group2, path="/", rtol=1e-9, atol=1e-14, ve
                 errors.append(f"{item_path}: {msg}")
 
             # Also compare dataset attributes
-            match, msg = compare_attributes(item1.attrs, item2.attrs, item_path)
+            match, msg = compare_attributes(item1.attrs, item2.attrs, item_path, rtol, atol)
             if not match:
                 errors.append(f"{item_path} [attributes]: {msg}")
 

@@ -450,37 +450,45 @@ int run( config_file& the_config )
         {
             delta_power.assign_function_of_grids_kdep([&](auto k, auto delta_power) {
                 real_t kmod = k.norm();
-                return std::pow(kmod/k0, nf)*delta_power;
+                // k = 0 is zeroed, as pow(0, nf) does for nf > 0, instead of inf for nf < 0
+                const real_t fac = (kmod > 0)? std::pow(kmod/k0, nf) : 0.0;
+                return fac*delta_power;
             }, delta_power);
         }
  
         delta_power.FourierTransformBackward();
         phi.FourierTransformBackward();
         real_t var_phi = delta_power.mean();  // = <phi^2>
+
+        music::ilog << "\n" << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Applying PNG modifications (local-type)" << colors::RESET << std::endl;
         if (fnl != 0)
-        {
-            music::ilog << "\n" << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Applying PNG modifications (local-type)" << colors::RESET << std::endl;
             music::ilog << colors::SYM_CHECK << " " << colors::TASK_NAME << "Computing f_NL term" << colors::RESET << std::endl;
 
-            phi.assign_function_of_grids_r([&](auto delta1, auto delta_power ){
-                     return norm*(delta1 - fnl*(delta_power - var_phi)*3.0/5.0) ;}, phi, delta_power);
-                    // the -3/5 factor is to match the usual fnl  in terms of phi
-                    // 3/5 fnl_zeta = fnl_phi
-        }
-        else{
-
-            music::ilog << "\n" << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Applying PNG modifications (local-type)" << colors::RESET << std::endl;
+        // the -3/5 factor is to match the usual fnl  in terms of phi
+        // 3/5 fnl_zeta = fnl_phi
+        // the -9/25 factor is to match the usual gnl  in terms of phi
+        // 9/25 gnl_zeta = gnl_phi
+        if (gnl != 0)
+        {
             music::ilog << colors::SYM_CHECK << " " << colors::TASK_NAME << "Computing g_NL term" << colors::RESET << std::endl;
-            
-            Conv.multiply_field(delta_power, phi , op::assign_to(delta_power)); // delta3 = delta^3
 
+            // delta^3 of the Gaussian field, in its own grid so that delta^2 is kept for the f_NL term
+            Grid_FFT<real_t> delta_cube({ngrid, ngrid, ngrid}, {boxlen, boxlen, boxlen});
+            delta_cube.FourierTransformForward(false);
+            Conv.multiply_field(delta_power, phi , op::assign_to(delta_cube)); // delta3 = delta^3
+
+            delta_cube.FourierTransformBackward();
             delta_power.FourierTransformBackward();
             phi.FourierTransformBackward();
 
+            phi.assign_function_of_grids_r([&](auto delta1, auto delta_power, auto delta_cube ){
+                     return norm*(delta1 - fnl*(delta_power - var_phi)*3.0/5.0
+                                         - gnl*(delta_cube - 3*var_phi*delta1)*9.0/25.0) ;}, phi, delta_power, delta_cube);
+        }
+        else
+        {
             phi.assign_function_of_grids_r([&](auto delta1, auto delta_power ){
-                     return norm*(delta1 - gnl*(delta_power - 3*var_phi*delta1)*9.0/25.0) ;}, phi, delta_power);  
-                      // the -9/25 factor is to match the usual gnl  in terms of phi
-                      // 9/25 gnl_zeta = gnl_phi  
+                     return norm*(delta1 - fnl*(delta_power - var_phi)*3.0/5.0) ;}, phi, delta_power);
         }
         delta_power.reset();
         phi.FourierTransformForward();
@@ -851,7 +859,13 @@ int run( config_file& the_config )
                                         the_output_plugin->write_species_as(this_species) == output_type::particles) ? true : false;
 
                 
-                grid_interpolate<1,Grid_FFT<real_t>> interp( tmp );
+                // The interpolator is only needed for the glass compensation kernel.
+                // Building it allocates and exchanges ghost slabs, so skip it for
+                // all other particle loads
+                std::unique_ptr<grid_interpolate<1,Grid_FFT<real_t>>> interp;
+                if( lattice_type == particle::lattice_glass ){
+                    interp = std::make_unique<grid_interpolate<1,Grid_FFT<real_t>>>( tmp );
+                }
 
                 phi.FourierTransformForward();
                 if( LPTorder > 1 ){
@@ -911,7 +925,7 @@ int run( config_file& the_config )
                                 }
 
                                 if( the_output_plugin->write_species_as( this_species ) == output_type::particles && lattice_type == particle::lattice_glass){
-                                    tmp.kelem(idx) *= interp.compensation_kernel( tmp.get_k<real_t>(i,j,k) ) ;
+                                    tmp.kelem(idx) *= interp->compensation_kernel( tmp.get_k<real_t>(i,j,k) ) ;
                                 }
 
                                 // divide by Lbox, because displacement is in box units for output plugin
@@ -974,7 +988,7 @@ int run( config_file& the_config )
 
                                 // correct with interpolation kernel if we used interpolation to read out the positions (for glasses)
                                 if( the_output_plugin->write_species_as( this_species ) == output_type::particles && lattice_type == particle::lattice_glass){
-                                    tmp.kelem(idx) *= interp.compensation_kernel( tmp.get_k<real_t>(i,j,k) );
+                                    tmp.kelem(idx) *= interp->compensation_kernel( tmp.get_k<real_t>(i,j,k) );
                                 }
 
                                 // correct velocity with PLT mode growth rate

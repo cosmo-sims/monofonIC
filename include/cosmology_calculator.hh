@@ -24,6 +24,7 @@
 #include <physical_constants.hh>
 #include <transfer_function_plugin.hh>
 #include <math/ode_integrate.hh>
+#include <algorithm>
 #include <logger.hh>
 
 #include <math/interpolate.hh>
@@ -172,31 +173,55 @@ private:
         double wa = cosmo_param_["w_a"];
         
 
-        // set ICs, very deep in radiation domination
-        const double a0 = 1e-6;
-        
+        // initial conditions (derivatives are w.r.t. conformal time, d/dtau = a H d/dln a)
+        //
+        // Without radiation: EdS-slaved solutions at a0 = 1e-6 (exact in matter domination).
+        //
+        // With radiation the start lies deep in radiation domination, where EdS data (D = a, f = 1) are
+        // not the growing mode: they contain the Meszaros decaying mode, which grows logarithmically
+        // until equality and biases D, f and, through the D^2 and D^3 sources, all higher-order factors
+        // (e.g. E/D^2 by -0.9% and Fb/D^3 by -0.8% at z = 99, growing with z; see
+        // validation/twofluid/studies/). Instead start on the radiation-era growing mode
+        // D = (2/3) a_eq (1 + 3/2 a/a_eq) (normalised so that D ~ a after equality) and let the higher
+        // orders start from zero at a0 = 1e-10, where they have converged to better than 1e-6.
+        const bool with_radiation = (Omega_r > 0.0);
+        const double a0 = with_radiation ? 1e-10 : 1e-6;
+
         // double H_a0 = H0 * std::sqrt(Omega_m / (a0 * a0 * a0) + (1 - Omega_m));
         double H_a0 = H_of_a(a0);
         const double t0 = 1.0 / (a0 * H_of_a(a0));
 
-        // first order growth
-        const double D0 = a0;
-        const double Dprime0 = a0 * a0 * H_a0;
-        
-        // second order growth
-        const double E0 = -3.0 / 7.0 * a0 * a0;
-        const double Eprime0 = -6.0 / 7.0 * std::pow(a0,3) * H_a0;
+        double y[10];
+        if (!with_radiation)
+        {
+            // first order growth
+            const double D0 = a0;
+            const double Dprime0 = a0 * a0 * H_a0;
 
-        // third order growth
-        const double Fa0 = -1.0 / 3.0 * a0 * a0 * a0;
-        const double Faprime0 = -2.0 * std::pow(a0, 5.0 / 2.0);
+            // second order growth
+            const double E0 = -3.0 / 7.0 * a0 * a0;
+            const double Eprime0 = -6.0 / 7.0 * std::pow(a0,3) * H_a0;
 
-        const double Fb0 = 10. / 21 * a0 * a0 * a0;
-        const double Fbprime0 = 60. / 21 * std::pow(a0, 5.0 / 2.0);
+            // third order growth
+            const double Fa0 = -1.0 / 3.0 * a0 * a0 * a0;
+            const double Faprime0 = -2.0 * std::pow(a0, 5.0 / 2.0);
 
-        const double Fc0 = -1.0 / 7.0 * a0 * a0 * a0;
+            const double Fb0 = 10. / 21 * a0 * a0 * a0;
+            const double Fbprime0 = 60. / 21 * std::pow(a0, 5.0 / 2.0);
 
-        double y[10] = {a0, D0, Dprime0, E0, Eprime0, Fa0, Faprime0, Fb0, Fbprime0, Fc0};
+            const double Fc0 = -1.0 / 7.0 * a0 * a0 * a0;
+
+            const double y0[10] = {a0, D0, Dprime0, E0, Eprime0, Fa0, Faprime0, Fb0, Fbprime0, Fc0};
+            std::copy(y0, y0 + 10, y);
+        }
+        else
+        {
+            const double aeq = Omega_r / Omega_m;
+            const double D0 = 2.0 / 3.0 * aeq + a0;           // (2/3) a_eq (1 + 3/2 a0/a_eq)
+            const double Dprime0 = a0 * H_a0 * a0;            // aH dD/dln a, dD/dln a = a0
+            const double y0[10] = {a0, D0, Dprime0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+            std::copy(y0, y0 + 10, y);
+        }
 
         const gsl_odeiv2_step_type * T = gsl_odeiv2_step_rkf45;
         gsl_odeiv2_step * s = gsl_odeiv2_step_alloc (T, 10);
@@ -207,7 +232,7 @@ private:
         ODEParams params = {Omega_r, Omega_m, Omega_DE, H0, w0, wa};
         gsl_odeiv2_system sys = {ode_system, nullptr, 10, &params};
 
-        double h = 1e-6;
+        double h = with_radiation ? 1e-3 * t0 : 1e-6;   // initial step, small against the conformal time t0
         double t = t0;
         double t1 = 0.1;
         double amax = 1.1;
@@ -239,12 +264,18 @@ private:
         gsl_odeiv2_control_free (c);
         gsl_odeiv2_step_free (s);
         
+        // complete the tables on every task: f from the stored D', and dotFc
+        for (size_t i = 0; i < tab_a.size(); ++i)
+        {
+            tab_dotFc[i] = (tab_D[i] * tab_dotE[i] - tab_E[i] * tab_f[i]); // toma
+            tab_f[i] = tab_f[i] / (tab_a[i] * H_of_a(tab_a[i]) * tab_D[i]);
+        }
+
         if (CONFIG::MPI_task_rank == 0)
         {
             // output growth factors to file for debugging
             std::ofstream output_file;
             output_file.open("GrowthFactors.txt");
-            // compute f, before we stored here D'
             output_file << "#"
                         << "a"
                         << " "
@@ -270,10 +301,6 @@ private:
                         << "\n";
             for (size_t i = 0; i < tab_a.size(); ++i)
             {
-
-                tab_dotFc[i] = (tab_D[i] * tab_dotE[i] - tab_E[i] * tab_f[i]); // toma
-                tab_f[i] = tab_f[i] / (tab_a[i] * H_of_a(tab_a[i]) * tab_D[i]);
-
                 // toma
                 output_file << tab_a[i] << " " << tab_D[i] << " " << tab_dotD[i] << " " << tab_E[i] << " " << tab_dotE[i] << " " << tab_Fa[i] << " " << tab_dotFa[i] << " " << tab_Fb[i] << " " << tab_dotFb[i] << " " << tab_Fc[i] << " " << tab_dotFc[i] << "\n";
             }
@@ -328,11 +355,21 @@ public:
         transfer_function_ = std::move(select_TransferFunction_plugin(cf, cosmo_param_));
         transfer_function_->intialise();
         if( !transfer_function_->tf_isnormalised_ ){
+            if( cosmo_param_["sigma_8"] <= 0.0 ){
+                throw std::runtime_error("Transfer function plugin '" + cf.get_value<std::string>("cosmology", "transfer")
+                    + "' cannot be normalised with A_s: set cosmology/sigma_8 instead.");
+            }
             cosmo_param_.set("pnorm", this->compute_pnorm_from_sigma8() );
         }else{
-            cosmo_param_.set("pnorm", 1.0/Dplus_target_/Dplus_target_);
-            auto sigma8 = this->compute_sigma8();
-            music::ilog << "Measured sigma_8 for given PS normalisation is " << colors::CONFIG_VALUE << sigma8 << colors::RESET << std::endl;
+            if( transfer_function_->tf_per_unit_growth_ ){
+                // transfer function is given per unit growth factor (D = a in matter domination): scale to z = 0
+                cosmo_param_.set("pnorm", Dnow_*Dnow_);
+            }else{
+                // transfer function is given at ztarget: scale to z = 0
+                cosmo_param_.set("pnorm", 1.0/Dplus_target_/Dplus_target_);
+            }
+            auto sigma8 = this->compute_sigma8_z0();
+            music::ilog << "Measured sigma_8 (z=0) for given PS normalisation is " << colors::CONFIG_VALUE << sigma8 << colors::RESET << std::endl;
         }
         cosmo_param_.set("sqrtpnorm", std::sqrt(cosmo_param_["pnorm"]));
 
@@ -707,6 +744,16 @@ public:
         // }
 
         return std::sqrt(sigma0);
+    }
+
+    //! sigma_8 of the normalised linear power spectrum at z = 0
+    /*! compute_sigma8() integrates the transfer function as returned by the
+     *  plugin, whose amplitude depends on the plugin's normalisation;
+     *  pnorm rescales it to the actual linear power spectrum at z = 0.
+     *  Requires pnorm to be set, i.e. only valid after construction. */
+    real_t compute_sigma8_z0(void)
+    {
+        return this->compute_sigma8() * std::sqrt(cosmo_param_["pnorm"]);
     }
 
     //! Computes the normalization for the power spectrum
