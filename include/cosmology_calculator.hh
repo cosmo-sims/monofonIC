@@ -368,7 +368,7 @@ public:
                 // transfer function is given at ztarget: scale to z = 0
                 cosmo_param_.set("pnorm", 1.0/Dplus_target_/Dplus_target_);
             }
-            auto sigma8 = this->compute_sigma8() * std::sqrt(cosmo_param_["pnorm"]);
+            auto sigma8 = this->compute_sigma8_z0();
             music::ilog << "Measured sigma_8 (z=0) for given PS normalisation is " << colors::CONFIG_VALUE << sigma8 << colors::RESET << std::endl;
         }
         cosmo_param_.set("sqrtpnorm", std::sqrt(cosmo_param_["pnorm"]));
@@ -744,6 +744,16 @@ public:
         // }
 
         return std::sqrt(sigma0);
+    }
+
+    //! sigma_8 of the normalised linear power spectrum at z = 0
+    /*! compute_sigma8() integrates the transfer function as returned by the
+     *  plugin, whose amplitude depends on the plugin's normalisation;
+     *  pnorm rescales it to the actual linear power spectrum at z = 0.
+     *  Requires pnorm to be set, i.e. only valid after construction. */
+    real_t compute_sigma8_z0(void)
+    {
+        return this->compute_sigma8() * std::sqrt(cosmo_param_["pnorm"]);
     }
 
     //! Computes the normalization for the power spectrum

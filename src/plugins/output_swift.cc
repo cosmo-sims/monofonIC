@@ -1365,7 +1365,7 @@ protected:
     HDFWriteGroupAttribute(fname_, derived, "D+ start", pcc_->Dplus_start_);
     HDFWriteGroupAttribute(fname_, derived, "D+ target", pcc_->Dplus_target_);
     HDFWriteGroupAttribute(fname_, derived, "sigma_8",
-                           (double)pcc_->compute_sigma8());
+                           (double)pcc_->compute_sigma8_z0());
 
     // Only species that were written have a particle mass
     for (int i = 0; i < 7; ++i) {
