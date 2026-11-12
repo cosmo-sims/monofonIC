@@ -264,12 +264,18 @@ private:
         gsl_odeiv2_control_free (c);
         gsl_odeiv2_step_free (s);
         
+        // complete the tables on every task: f from the stored D', and dotFc
+        for (size_t i = 0; i < tab_a.size(); ++i)
+        {
+            tab_dotFc[i] = (tab_D[i] * tab_dotE[i] - tab_E[i] * tab_f[i]); // toma
+            tab_f[i] = tab_f[i] / (tab_a[i] * H_of_a(tab_a[i]) * tab_D[i]);
+        }
+
         if (CONFIG::MPI_task_rank == 0)
         {
             // output growth factors to file for debugging
             std::ofstream output_file;
             output_file.open("GrowthFactors.txt");
-            // compute f, before we stored here D'
             output_file << "#"
                         << "a"
                         << " "
@@ -295,10 +301,6 @@ private:
                         << "\n";
             for (size_t i = 0; i < tab_a.size(); ++i)
             {
-
-                tab_dotFc[i] = (tab_D[i] * tab_dotE[i] - tab_E[i] * tab_f[i]); // toma
-                tab_f[i] = tab_f[i] / (tab_a[i] * H_of_a(tab_a[i]) * tab_D[i]);
-
                 // toma
                 output_file << tab_a[i] << " " << tab_D[i] << " " << tab_dotD[i] << " " << tab_E[i] << " " << tab_dotE[i] << " " << tab_Fa[i] << " " << tab_dotFa[i] << " " << tab_Fb[i] << " " << tab_dotFb[i] << " " << tab_Fc[i] << " " << tab_dotFc[i] << "\n";
             }
