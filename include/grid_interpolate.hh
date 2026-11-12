@@ -33,7 +33,7 @@ struct grid_interpolate
   static constexpr int interpolation_order = interp_order;
 
   std::vector<data_t> boundary_;
-  std::vector<int> local0starts_;
+  std::vector<int> owner_of_slab_; //!< task owning each slab along the first dimension
   const grid_t &gridref;
   size_t nx_, ny_, nz_;
 
@@ -51,38 +51,76 @@ struct grid_interpolate
   void update_ghosts( const grid_t &g )
   {
   #if defined(USE_MPI)
+    const int ntasks = MPI::get_size(), rank = MPI::get_rank();
+    const size_t n0 = g.n_[0];
 
-    int local_0_start = int(gridref.local_0_start_);
-    local0starts_.assign(MPI::get_size(), 0);
+    //... slab decomposition of all tasks; tasks may own any number of slabs, including none
+    long long my_start = static_cast<long long>(g.local_0_start_), my_size = static_cast<long long>(g.local_0_size_);
+    std::vector<long long> starts(ntasks), sizes(ntasks);
+    MPI_Allgather(&my_start, 1, MPI_LONG_LONG, &starts[0], 1, MPI_LONG_LONG, MPI_COMM_WORLD);
+    MPI_Allgather(&my_size, 1, MPI_LONG_LONG, &sizes[0], 1, MPI_LONG_LONG, MPI_COMM_WORLD);
 
-    MPI_Allgather(&local_0_start, 1, MPI_INT, &local0starts_[0], 1, MPI_INT, MPI_COMM_WORLD);
+    owner_of_slab_.assign(n0, -1);
+    for (int itask = 0; itask < ntasks; ++itask)
+      for (long long i = starts[itask]; i < starts[itask] + sizes[itask]; ++i)
+        owner_of_slab_[i] = itask;
 
-    //... exchange boundary
-    size_t nx = interpolation_order + 1;
-    size_t ny = g.n_[1];
-    size_t nz = g.n_[2];
+    //... each task with data needs the nx slabs following its own (periodically), from whichever task owns them
+    const size_t nx = interpolation_order + 1;
+    const size_t ny = g.n_[1];
+    const size_t nz = g.n_[2];
+    const size_t slicesz = ny * nz;
+    const int tagbase = 4711;
 
-    boundary_.assign(nx * ny * nz, data_t{0.0});
+    boundary_.assign(nx * slicesz, data_t{0.0});
 
-    for (size_t i = 0; i < nx; ++i)
+    std::vector<MPI_Request> req;
+    std::vector<std::vector<data_t>> sendbuf;
+
+    if (my_size > 0)
     {
-      for (size_t j = 0; j < ny; ++j)
+      for (size_t i = 0; i < nx; ++i)
       {
-        for (size_t k = 0; k < nz; ++k)
-        {
-          boundary_[(i * ny + j) * nz + k] = g.relem(i, j, k);
-        }
+        const size_t islab = (my_start + my_size + i) % n0;
+        req.emplace_back();
+        MPI_Irecv(&boundary_[i * slicesz], int(slicesz), MPI::get_datatype<data_t>(), owner_of_slab_[islab],
+                  tagbase + int(i), MPI_COMM_WORLD, &req.back());
       }
     }
 
-    int sendto = (MPI::get_rank() + MPI::get_size() - 1) % MPI::get_size();
-    int recvfrom = (MPI::get_rank() + MPI::get_size() + 1) % MPI::get_size();
+    for (int itask = 0; itask < ntasks; ++itask)
+    {
+      if (sizes[itask] == 0) continue;
+      for (size_t i = 0; i < nx; ++i)
+      {
+        const size_t islab = (starts[itask] + sizes[itask] + i) % n0;
+        if (owner_of_slab_[islab] != rank) continue;
 
-    MPI_Status status;
-    status.MPI_ERROR = MPI_SUCCESS;
+        const size_t ii = islab - my_start;
+        sendbuf.emplace_back(slicesz);
+        for (size_t j = 0; j < ny; ++j)
+          for (size_t k = 0; k < nz; ++k)
+            sendbuf.back()[j * nz + k] = g.relem(ii, j, k);
+      }
+    }
 
-    int err = MPI_Sendrecv_replace(&boundary_[0], nx * ny * nz, MPI::get_datatype<data_t>(), sendto,
-                          MPI::get_rank() + 1000, recvfrom, recvfrom + 1000, MPI_COMM_WORLD, &status);
+    //... post the sends only after all buffers exist, as emplace_back may move them
+    size_t isend = 0;
+    for (int itask = 0; itask < ntasks; ++itask)
+    {
+      if (sizes[itask] == 0) continue;
+      for (size_t i = 0; i < nx; ++i)
+      {
+        const size_t islab = (starts[itask] + sizes[itask] + i) % n0;
+        if (owner_of_slab_[islab] != rank) continue;
+
+        req.emplace_back();
+        MPI_Isend(&sendbuf[isend++][0], int(slicesz), MPI::get_datatype<data_t>(), itask,
+                  tagbase + int(i), MPI_COMM_WORLD, &req.back());
+      }
+    }
+
+    int err = MPI_Waitall(int(req.size()), req.data(), MPI_STATUSES_IGNORE);
 
     if( err != MPI_SUCCESS ){
       char errstr[256]; int errlen=256;
@@ -153,8 +191,10 @@ struct grid_interpolate
 
   int get_task(const vec3 &x) const noexcept
   {
-    const auto it = std::upper_bound(local0starts_.begin(), local0starts_.end(), int(x[0]));
-    return std::distance(local0starts_.begin(), it)-1;
+    const ptrdiff_t n0 = static_cast<ptrdiff_t>(owner_of_slab_.size());
+    ptrdiff_t ix = static_cast<ptrdiff_t>(std::floor(x[0])) % n0;
+    if (ix < 0) ix += n0;
+    return owner_of_slab_[ix];
   }
 
   void domain_decompose_pos(std::vector<vec3> &pos) const noexcept
