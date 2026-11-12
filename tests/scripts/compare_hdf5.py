@@ -100,6 +100,13 @@ def compare_attributes(attrs1, attrs2, name):
         'Git Branch',        # Git branch name, may differ
         'Build Time',        # Compilation timestamp
         'Build Date',        # Compilation date
+        'Build Type',        # CMake build type
+        'Compiler',          # Compiler version
+        'FFTW Version',      # Library versions, different between machines
+        'HDF5 Version',
+        'CLASS Revision',    # CLASS version, may differ
+        'CLASS Tag',
+        'config_basepath',   # Absolute path of the config file
     }
 
     # Check all keys present in both

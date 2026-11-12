@@ -86,6 +86,9 @@ namespace cosmology
         //! shortcut get routine for cosmological parameter key-value pairs through bracket operator
         inline double operator[](const std::string &key) const { return this->get(key); }
 
+        //! read-only access to every cosmological parameter, e.g. to record them
+        const std::map<std::string, double> &get_all() const { return pmap_; }
+
         //! get routine for what the "total matter" component is
         cosmology::total_type_t get_total_type() const noexcept {
             return total_type_;

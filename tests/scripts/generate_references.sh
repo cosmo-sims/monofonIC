@@ -44,6 +44,7 @@ TESTS=(
     "test_3lpt_bcc_swift.conf:test_3lpt_bcc_swift.hdf5"
     "test_2lpt_baryons_generic.conf:test_2lpt_baryons_generic.hdf5"
     "test_2lpt_baryons_vrel_gadget.conf:test_2lpt_baryons_vrel_gadget.hdf5"
+    "test_2lpt_baryons_swift.conf:test_2lpt_baryons_swift.hdf5"
 )
 
 # Temporary directory for running tests

@@ -22,6 +22,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -901,8 +902,10 @@ inline void HDFCreateEmptyDataset( const std::string Filename, const std::string
 
   if (filter)
     {
-      // 1MB chunking
-      hsize_t HDF_Dims[1] = {1024 * 1024 / sizeof(T)};
+      // 1MB chunking, no larger than the dataset: HDF5 rejects chunks that
+      // exceed a fixed-size dimension
+      hsize_t HDF_Dims[1] = {std::max<hsize_t>(
+          1, std::min<hsize_t>(1024 * 1024 / sizeof(T), num_particles))};
       H5Pset_chunk(HDF_Prop, 1, HDF_Dims);
 
       // md5 checksum
@@ -941,8 +944,10 @@ inline void HDFCreateEmptyDatasetVector( const std::string Filename, const std::
 
   if (filter)
     {
-      // ~1MB chunking
-      hsize_t HDF_Dims[2] = {256 * 1024 / sizeof(T), 3};
+      // ~1MB chunking, no larger than the dataset: HDF5 rejects chunks that
+      // exceed a fixed-size dimension
+      hsize_t HDF_Dims[2] = {std::max<hsize_t>(
+          1, std::min<hsize_t>(256 * 1024 / sizeof(T), num_particles)), 3};
       H5Pset_chunk(HDF_Prop, 2, HDF_Dims);
 
       // md5 checksum

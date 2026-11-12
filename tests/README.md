@@ -5,7 +5,7 @@ This directory contains regression tests for monofonIC to catch commits that bre
 ## Overview
 
 The test suite consists of:
-- **5 regression test configurations** covering different LPT orders, particle loads, and output formats
+- **6 regression test configurations** covering different LPT orders, particle loads, and output formats
 - **1 MPI consistency test** that verifies identical results across different MPI task counts
 - **Reference HDF5 files** containing expected outputs
 - **Comparison script** that performs hybrid tolerance checking (exact for integers, 1e-9 relative tolerance for floats)
@@ -21,6 +21,7 @@ The test suite consists of:
 | `test_3lpt_bcc_swift` | 3LPT | bcc (2×32³) | No | - | SWIFT HDF5 |
 | `test_2lpt_baryons_generic` | 2LPT | sc (32³) | Yes | No | Generic HDF5 |
 | `test_2lpt_baryons_vrel_gadget` | 2LPT | sc (32³) | Yes | Yes | Gadget HDF5 |
+| `test_2lpt_baryons_swift` | 2LPT | sc (32³) | Yes | No | SWIFT HDF5 |
 
 All tests use:
 - Grid resolution: 32³ (fast execution)

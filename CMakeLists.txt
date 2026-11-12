@@ -283,6 +283,14 @@ if(HDF5_FOUND)
   target_link_libraries(${PRGNAME} PRIVATE ${HDF5_LIBRARIES})
   target_include_directories(${PRGNAME} PRIVATE ${HDF5_INCLUDE_DIRS})
   target_compile_definitions(${PRGNAME} PRIVATE "USE_HDF5")
+
+  # collective HDF5 writes need MPI *and* an HDF5 built with parallel support
+  if(MPI_CXX_FOUND AND HDF5_IS_PARALLEL)
+    target_compile_definitions(${PRGNAME} PRIVATE "USE_PARALLEL_HDF5")
+    message(STATUS "HDF5 has parallel support: using collective I/O for SWIFT output")
+  else()
+    message(STATUS "HDF5 without parallel support: SWIFT output serialises shared-file writes")
+  endif()
 endif(HDF5_FOUND)
 
 if(ENABLE_PANPHASIA)

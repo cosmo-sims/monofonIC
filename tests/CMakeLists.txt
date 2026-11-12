@@ -110,7 +110,7 @@ function(add_plane_wave_test TEST_NAME CONFIG_FILE DIAG_FILENAME OUTPUT_FILENAME
     message(STATUS "Test ${TEST_NAME}: Registered")
 endfunction()
 
-# Register the 5 regression tests
+# Register the 6 regression tests
 add_regression_test(
     test_1lpt_sc_generic
     test_1lpt_sc_generic.conf
@@ -139,6 +139,12 @@ add_regression_test(
     test_2lpt_baryons_vrel_gadget
     test_2lpt_baryons_vrel_gadget.conf
     test_2lpt_baryons_vrel_gadget.hdf5
+)
+
+add_regression_test(
+    test_2lpt_baryons_swift
+    test_2lpt_baryons_swift.conf
+    test_2lpt_baryons_swift.hdf5
 )
 
 add_plane_wave_test(
