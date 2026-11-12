@@ -295,6 +295,9 @@ endif(HDF5_FOUND)
 
 if(ENABLE_PANPHASIA)
   target_compile_definitions(${PRGNAME} PRIVATE "USE_PANPHASIA")
+  # PANPHASIA's text dump of the Fourier-space white noise is a diagnostic
+  # (one file per rank, ~65 bytes per mode), so only build it into Debug builds
+  target_compile_definitions(${PRGNAME} PRIVATE $<$<CONFIG:DEBUG>:PANPHASIA_DEBUG_OUTPUT>)
 endif(ENABLE_PANPHASIA)
 
 # if(ENABLE_PANPHASIA_HO)

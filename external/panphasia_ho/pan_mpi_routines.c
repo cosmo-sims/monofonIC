@@ -431,6 +431,11 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
 
   //printf("Reached here 12!\n");
 
+  // Diagnostic text dump of the Fourier field, only built in Debug builds
+  // (PANPHASIA_DEBUG_OUTPUT, set in CMakeLists.txt). The guard below was meant
+  // to disable the full dump, but nfft_dim is a size_t so (nfft_dim < -1) is
+  // always true and every run wrote the whole field.
+#ifdef PANPHASIA_DEBUG_OUTPUT
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   char filename[100];
@@ -475,6 +480,7 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
         };
     fclose(fp);
   };
+#endif // PANPHASIA_DEBUG_OUTPUT
 
   // Transpose output field
 
