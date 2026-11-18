@@ -45,7 +45,21 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
 
   int pmax = 6;
 
-  int nsubdivide = 21; //(pmax%2==0)?pmax+1:pmax+2;
+  int mpi_size;
+  MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+
+  ptrdiff_t N0_pan_grid = descriptor_base_size << relative_level;
+
+  if (N0_fourier_grid % N0_pan_grid != 0)
+    return (100015);
+
+  int fdim = N0_fourier_grid / N0_pan_grid;
+  size_t nfft_dim = N0_fourier_grid;
+  size_t npan_dim = N0_pan_grid;
+
+  int SHARED_FOUR_PAN_SPACE = (mpi_size == 1) && (N0_pan_grid % 2 == 0) && (sizeof(PAN_REAL) == sizeof(FFTW_REAL));
+
+  int nsubdivide = SHARED_FOUR_PAN_SPACE ? 1 : 21; //(pmax%2==0)?pmax+1:pmax+2;
 
   size_t ncopy = (pmax + 1) * (pmax + 2) * (pmax + 3) / 6;
 
@@ -60,17 +74,6 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
   ptrdiff_t size_to_alloc_pan;
   ptrdiff_t local_fourier_x_start, local_fourier_x_end;
   FFTW_PLAN output_coeff_forward_plan;
-
-  ptrdiff_t N0_pan_grid = descriptor_base_size << relative_level;
-
-  if (N0_fourier_grid % N0_pan_grid != 0)
-    return (100015);
-
-  int fdim = N0_fourier_grid / N0_pan_grid;
-  size_t nfft_dim = N0_fourier_grid;
-  size_t npan_dim = N0_pan_grid;
-
-  int SHARED_FOUR_PAN_SPACE = (nsubdivide == 1) && (fdim == 1) && (sizeof(PAN_REAL) == sizeof(FFTW_REAL));
 
   ////////////////////////////////////////////////////////////////////////////////////
 
@@ -163,7 +166,20 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
     // const ptrdiff_t ndimens_alloc_pan[] = {N0_pan_grid, N0_pan_grid, N0_pan_grid+2};
     howmany = ncopy;
 
-    size_to_alloc_pan = howmany * local_n0_pan * N0_pan_grid * (N0_pan_grid + 2);
+    if (SHARED_FOUR_PAN_SPACE)
+    {
+      const ptrdiff_t ndimens_alloc_pan[] = {N0_pan_grid, N0_pan_grid, N0_pan_grid + 2};
+      ptrdiff_t local_n0_pan_fft, local_0_start_pan_fft;
+      size_to_alloc_pan = FFTW_MPI_LOCAL_SIZE_MANY(rank, ndimens_alloc_pan, howmany,
+                                                   FFTW_MPI_DEFAULT_BLOCK, MPI_COMM_WORLD,
+                                                   &local_n0_pan_fft, &local_0_start_pan_fft);
+      if ((local_0_start_pan_fft != local_0_start_pan) || (local_n0_pan_fft != local_n0_pan))
+        return (100037);
+    }
+    else
+    {
+      size_to_alloc_pan = howmany * local_n0_pan * N0_pan_grid * (N0_pan_grid + 2);
+    };
 
     //printf("size_to_alloc_fourier = %td\n",size_to_alloc_fourier);
     //printf("size_to_alloc_pan     = %td\n",size_to_alloc_pan);
@@ -177,7 +193,7 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
   // If nsubdivide==1 then use the same structure to store both.
 
   void *panphasia_coefficients = FFTW_MALLOC(sizeof(PAN_REAL) * size_to_alloc_pan);
-  void *fourier_grids;
+  void *fourier_grids = NULL;
 
   if (panphasia_coefficients == NULL)
     return (100040);
@@ -266,7 +282,8 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
 
   {
     int rank = 3;
-    const ptrdiff_t ndimens[3] = {N0_fourier_grid, N0_fourier_grid, N0_fourier_grid};
+    ptrdiff_t n_fft_plan = SHARED_FOUR_PAN_SPACE ? N0_pan_grid : N0_fourier_grid;
+    const ptrdiff_t ndimens[3] = {n_fft_plan, n_fft_plan, n_fft_plan};
     ptrdiff_t howmany = nchunk;
     ptrdiff_t block = FFTW_MPI_DEFAULT_BLOCK;
     ptrdiff_t tblock = FFTW_MPI_DEFAULT_BLOCK;
@@ -345,15 +362,40 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
           for (int iz = 0; iz <= nfft_dim / 2; iz++)
           {
             index1 = ix * N0_fourier_grid * (N0_fourier_grid / 2 + 1) + iy * (N0_fourier_grid / 2 + 1) + iz;
+            size_t base_index2;
+            int use_conj = 0;
+            if (SHARED_FOUR_PAN_SPACE)
+            {
+              size_t ix_p = (size_t)(ix + local_0_start_fourier_return) % npan_dim;
+              size_t iy_p = (size_t)iy % npan_dim;
+              size_t iz_p = (size_t)iz % npan_dim;
+              if (iz_p > npan_dim / 2)
+              {
+                ix_p = (ix_p == 0) ? 0 : npan_dim - ix_p;
+                iy_p = (iy_p == 0) ? 0 : npan_dim - iy_p;
+                iz_p = npan_dim - iz_p;
+                use_conj = 1;
+              };
+              base_index2 = nchunk * (ix_p * N0_pan_grid * (N0_pan_grid / 2 + 1) + iy_p * (N0_pan_grid / 2 + 1) + iz_p);
+            }
+            else
+            {
+              base_index2 = nchunk * index1;
+            };
+            FFTW_COMPLEX sum = return_field[index1];
             for (int m = 0; m < nchunk; m++)
             {
-              index2 = nchunk * index1 + m;
+              index2 = base_index2 + m;
+              double complex coeff = ptr_cmplx_fourier_grid[index2];
+              if (use_conj)
+                coeff = conj(coeff);
 
               weight = sph_bessel_coeff[n4dimen * irank_p[0][m + moffset] + ix + local_0_start_fourier_return] *
                        sph_bessel_coeff[n4dimen * irank_p[1][m + moffset] + iy] *
                        sph_bessel_coeff[n4dimen * irank_p[2][m + moffset] + iz];
-              return_field[index1] += weight * ptr_cmplx_fourier_grid[index2];
+              sum += weight * coeff;
             };
+            return_field[index1] = sum;
           };
     };
 
