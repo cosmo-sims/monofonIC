@@ -182,6 +182,14 @@ list (APPEND SOURCES
   ${PROJECT_SOURCE_DIR}/external/panphasia_ho/pan_mpi_routines.c
   ${PROJECT_SOURCE_DIR}/external/panphasia_ho/uniform_rand_threefry4x64.c
 )
+if(OPENMP_FOUND)
+  set_source_files_properties(
+    ${PROJECT_SOURCE_DIR}/external/panphasia_ho/high_order_panphasia_routines.c
+    ${PROJECT_SOURCE_DIR}/external/panphasia_ho/pan_mpi_routines.c
+    ${PROJECT_SOURCE_DIR}/external/panphasia_ho/uniform_rand_threefry4x64.c
+    PROPERTIES COMPILE_DEFINITIONS "USE_OPENMP"
+  )
+endif()
 # target_include_directories(${PRGNAME} PRIVATE ${PROJECT_SOURCE_DIR}/external/panphasia_ho)
 endif()
 endif()
