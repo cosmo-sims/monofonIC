@@ -77,7 +77,7 @@ public:
     grid_res_ = pcf_->get_value<size_t>("setup", "GridRes");
     boxlength_ = pcf_->get_value<real_t>("setup", "BoxLength");
 
-    if( pcf_->get_value<bool>("setup", "DoFixing") ){
+    if( pcf_->get_value_safe<bool>("setup", "DoFixing", false) ){
       music::flog << "Fixing all the modes to the mean power negates any advantage of using the Panphasia field.\n";
       music::flog << "With the new panphasia ho it is possible by choosing the descriptor to fix the largest modes without losing the ability to resimulate to much higher resolution.\n";
       throw std::runtime_error("PANPHASIA: incompatible parameter.");
