@@ -1027,12 +1027,12 @@ int PANPHASIA_compute_coefficients_(size_t *xstart, size_t *ystart, size_t *zsta
       return (error_code);
   };
   //===================================================================
-  // Allocate memory to store all the cell properties
+  // Allocate memory to store cell properties for coarse levels (< level_max)
   //===================================================================
   {
     size_t number_of_cells = 0;
 
-    for (int i = level_max; i >= 0; i--)
+    for (int i = (int)level_max - 1; i >= 0; i--)
     {
       cumulative_cell_index[i] = number_of_cells;
       number_of_cells += level_count_x[i] * level_count_y[i] * level_count_z[i];
@@ -1044,9 +1044,13 @@ int PANPHASIA_compute_coefficients_(size_t *xstart, size_t *ystart, size_t *zsta
     cell_memory_to_allocate = sizeof(PAN_REAL) * number_of_cells * Nbasis;
   };
 
-  PAN_REAL *working_space = malloc(cell_memory_to_allocate);
-  if (working_space == NULL)
-    return (210);
+  PAN_REAL *working_space = NULL;
+  if (cell_memory_to_allocate > 0)
+  {
+    working_space = malloc(cell_memory_to_allocate);
+    if (working_space == NULL)
+      return (210);
+  }
 
   //========================================================================================
   // Loop over octree starting at the root, for all relevant cells at each level
@@ -1067,8 +1071,26 @@ int PANPHASIA_compute_coefficients_(size_t *xstart, size_t *ystart, size_t *zsta
     PAN_REAL parent[Nbasis];
     PAN_REAL children[8 * Nbasis];
 
+    PAN_REAL *ptr_real = output_values;
+    PAN_COMPLEX *ptr_cmplx = output_values;
+    size_t zdimension = (*flag_output_mode == 2) ? *zextent + 2 : *zextent; // For R2C pad by two in z-dimension
+
     if (level_max == 0)
-      return_root_legendre_coefficients_(working_space); // Return root cell coefficients
+    {
+      return_root_legendre_coefficients_(parent); // Return root cell coefficients
+      size_t xloc = index_perm_x[0], yloc = index_perm_y[0], zloc = index_perm_z[0];
+      size_t out_v_index = *ncopy * (xloc * (*yextent) * zdimension + yloc * zdimension + zloc);
+      if (*flag_output_mode == 1)
+      {
+        for (i = 0; i < *ncopy; i++)
+          ptr_cmplx[out_v_index + i] = (PAN_COMPLEX)parent[copy_list[i]];
+      }
+      else
+      {
+        for (i = 0; i < *ncopy; i++)
+          ptr_real[out_v_index + i] = parent[copy_list[i]];
+      };
+    }
 
 #ifdef USE_OPENMP
     double start, end;
@@ -1128,13 +1150,33 @@ int PANPHASIA_compute_coefficients_(size_t *xstart, size_t *ystart, size_t *zsta
                     yco = child_pointer_y[2 * yoffset + iy] - level_begin_y[level + 1];
                     zco = child_pointer_z[2 * zoffset + iz] - level_begin_z[level + 1];
 
-                    child_index = cumulative_cell_index[level + 1] + xco * level_count_y[level + 1] * level_count_z[level + 1] +
-                                  yco * level_count_z[level + 1] + zco;
-
-                    work_index = Nbasis * child_index;
                     selected_child_index = Nbasis * (4 * ix + 2 * iy + iz);
-                    for (i = 0; i < Nbasis; i++)
-                      working_space[work_index + i] = children[selected_child_index + i];
+
+                    if (level + 1 == level_max)
+                    {
+                      size_t xloc = index_perm_x[xco], yloc = index_perm_y[yco], zloc = index_perm_z[zco];
+                      size_t out_v_index = *ncopy * (xloc * (*yextent) * zdimension + yloc * zdimension + zloc);
+
+                      if (*flag_output_mode == 1)
+                      {
+                        for (i = 0; i < *ncopy; i++)
+                          ptr_cmplx[out_v_index + i] = (PAN_COMPLEX)children[selected_child_index + copy_list[i]];
+                      }
+                      else
+                      {
+                        for (i = 0; i < *ncopy; i++)
+                          ptr_real[out_v_index + i] = children[selected_child_index + copy_list[i]];
+                      };
+                    }
+                    else
+                    {
+                      child_index = cumulative_cell_index[level + 1] + xco * level_count_y[level + 1] * level_count_z[level + 1] +
+                                    yco * level_count_z[level + 1] + zco;
+
+                      work_index = Nbasis * child_index;
+                      for (i = 0; i < Nbasis; i++)
+                        working_space[work_index + i] = children[selected_child_index + i];
+                    };
                   };
                 }; // end loop over possible children
 
@@ -1159,45 +1201,6 @@ int PANPHASIA_compute_coefficients_(size_t *xstart, size_t *ystart, size_t *zsta
       printf("Time in OMP Section = %lf seconds \n", cpu_time_used);
 
 #endif
-  };
-
-  //========================================================================================
-  // Assign data from work_space to the input array
-  //========================================================================================
-  {
-
-    PAN_REAL *ptr_real = output_values;
-    PAN_COMPLEX *ptr_cmplx = output_values;
-    size_t zdimension = (*flag_output_mode == 2) ? *zextent + 2 : *zextent; // For R2C pad by two in z-dimension
-
-    //printf("zdimension = %ld\n",zdimension);
-
-    //  PAN_COMPLEX  *ptr_cplx;
-    //  *ptr_real =(* PAN_REAL) *output_values;
-    //  *ptr_cplx = output_values
-
-    for (size_t xco = 0; xco < *xextent; xco++)
-      for (size_t yco = 0; yco < *yextent; yco++)
-        for (size_t zco = 0; zco < *zextent; zco++)
-        {
-          size_t xloc = index_perm_x[xco], yloc = index_perm_y[yco], zloc = index_perm_z[zco];
-
-          size_t index = Nbasis * (xco * (*yextent) * (*zextent) + yco * (*zextent) + zco);
-          size_t out_v_index = *ncopy * (xloc * (*yextent) * zdimension + yloc * zdimension + zloc);
-
-          if (*flag_output_mode == 1)
-          {
-
-            for (size_t i = 0; i < *ncopy; i++)
-              ptr_cmplx[out_v_index + i] = (PAN_COMPLEX)working_space[index + copy_list[i]];
-          }
-          else
-          {
-
-            for (size_t i = 0; i < *ncopy; i++)
-              ptr_real[out_v_index + i] = working_space[index + copy_list[i]];
-          };
-        };
   };
 
   //===========================================(==============================================

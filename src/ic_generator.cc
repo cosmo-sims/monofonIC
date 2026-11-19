@@ -69,6 +69,13 @@ std::unique_ptr<cosmology::calculator>  the_cosmo_calc;
 int initialise( config_file& the_config )
 {
     the_random_number_generator = std::move(select_RNG_plugin(the_config));
+
+    // in white-noise-only mode the cosmology (incl. transfer function) and output plugins are not needed
+    if( the_config.get_value_safe<bool>("setup", "WhiteNoiseOnly", false) ){
+        music::ilog << "White-noise-only mode: cosmology, transfer function and output plugins are " << colors::CONFIG_VALUE << "not initialised" << colors::RESET << std::endl;
+        return 0;
+    }
+
     the_cosmo_calc              = std::make_unique<cosmology::calculator>(the_config);
     the_output_plugin           = std::move(select_output_plugin(the_config, the_cosmo_calc));
     
@@ -87,6 +94,88 @@ void reset () {
 
 
 /**
+ * @brief Generate only the white noise field and write it to an HDF5 file, skipping cosmology, LPT and IC output
+ * 
+ * @param the_config reference to the config_file object
+ * @return int 0 if successful
+ */
+int run_white_noise_only( config_file& the_config )
+{
+    const size_t ngrid = the_config.get_value<size_t>("setup", "GridRes");
+    const real_t boxlen = the_config.get_value<double>("setup", "BoxLength");
+    const bool bDoFixing    = the_config.get_value_safe<bool>("setup", "DoFixing", false);
+    const bool bDoInversion = the_config.get_value_safe<bool>("setup", "DoInversion", false);
+    const std::string fname_wn = the_config.get_value_safe<std::string>("output", "WhiteNoiseFile", "white_noise.hdf5");
+
+    music::ilog << music::HRULE << std::endl;
+    music::ilog << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " White-noise-only mode" << colors::RESET << std::endl;
+    music::ilog << "Only the white noise field is generated; no LPT fields or ICs are computed." << std::endl;
+    music::ilog << std::setw(32) << std::left << "Grid resolution" << " : " << colors::CONFIG_VALUE << ngrid << "^3" << colors::RESET << std::endl;
+    music::ilog << std::setw(32) << std::left << "Box length" << " : " << colors::CONFIG_VALUE << boxlen << colors::RESET << std::endl;
+    music::ilog << std::setw(32) << std::left << "Fixing of mode amplitudes" << " : " << colors::CONFIG_VALUE << (bDoFixing?"enabled":"disabled") << colors::RESET << std::endl;
+    music::ilog << std::setw(32) << std::left << "Inversion of phases" << " : " << colors::CONFIG_VALUE << (bDoInversion?"enabled":"disabled") << colors::RESET << std::endl;
+    music::ilog << std::setw(32) << std::left << "Output file" << " : " << colors::CONFIG_VALUE << fname_wn << colors::RESET << std::endl;
+
+    Grid_FFT<real_t> wnoise({ngrid, ngrid, ngrid}, {boxlen, boxlen, boxlen});
+
+    music::ilog << music::HRULE << std::endl;
+    music::ilog << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Generating white noise field" << colors::RESET << std::endl;
+    double wtime = get_wtime();
+    the_random_number_generator->Fill_Grid(wnoise);
+    music::ilog << std::setw(70) << std::setfill(' ') << std::right << "took : " << std::setw(8) << get_wtime() - wtime << "s" << std::endl;
+
+    if( bDoFixing || bDoInversion ){
+        wnoise.FourierTransformForward();
+        wnoise.apply_function_k( [&](auto wn){
+            if (bDoFixing){
+                wn = (std::fabs(wn) != 0.0) ? wn / std::fabs(wn) : wn;
+            }
+            return ((bDoInversion)? real_t{-1.0} : real_t{1.0}) * wn;
+        });
+    }
+    wnoise.FourierTransformBackward();
+
+    //... report the mean and variance of the real-space field
+    double sum = 0.0, sum2 = 0.0;
+    #pragma omp parallel for reduction(+:sum,sum2)
+    for (size_t i = 0; i < wnoise.size(0); ++i) {
+        for (size_t j = 0; j < wnoise.size(1); ++j) {
+            for (size_t k = 0; k < wnoise.size(2); ++k) {
+                const double w = wnoise.relem(i, j, k);
+                sum += w;
+                sum2 += w * w;
+            }
+        }
+    }
+#if defined(USE_MPI)
+    double glob[2] = {0.0, 0.0}, loc[2] = {sum, sum2};
+    MPI_Allreduce(loc, glob, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    sum = glob[0]; sum2 = glob[1];
+#endif
+    const double ncells = double(ngrid) * double(ngrid) * double(ngrid);
+    const double mean = sum / ncells;
+    music::ilog << std::setw(32) << std::left << "White noise mean" << " : " << mean << std::endl;
+    music::ilog << std::setw(32) << std::left << "White noise variance" << " : " << sum2 / ncells - mean * mean << std::endl;
+
+    music::ilog << music::HRULE << std::endl;
+    music::ilog << colors::BOLD << colors::HEADER << colors::SYM_DIAMOND << " Writing white noise field" << colors::RESET << std::endl;
+    wtime = get_wtime();
+#if defined(USE_MPI)
+    if (CONFIG::MPI_task_rank == 0)
+        unlink(fname_wn.c_str());
+    MPI_Barrier(MPI_COMM_WORLD);
+#else
+    unlink(fname_wn.c_str());
+#endif
+    wnoise.Write_to_HDF5(fname_wn, "white_noise");
+    music::ilog << "Wrote dataset 'white_noise' (" << ngrid << "^3, real space) to " << fname_wn << std::endl;
+    music::ilog << std::setw(70) << std::setfill(' ') << std::right << "took : " << std::setw(8) << get_wtime() - wtime << "s" << std::endl;
+
+    return 0;
+}
+
+
+/**
  * @brief Main driver routine for IC generation, everything interesting happens here
  * 
  * @param the_config reference to the config_file object
@@ -94,6 +183,12 @@ void reset () {
  */
 int run( config_file& the_config )
 {
+    //--------------------------------------------------------------------------------------------------------
+    //! only generate and write the white noise field if requested
+    if( the_config.get_value_safe<bool>("setup", "WhiteNoiseOnly", false) ){
+        return run_white_noise_only( the_config );
+    }
+
     //--------------------------------------------------------------------------------------------------------
     // Read run parameters
     //--------------------------------------------------------------------------------------------------------

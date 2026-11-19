@@ -20,6 +20,22 @@ extern size_t descriptor_order;
 extern size_t descriptor_kk_limit;
 extern size_t descriptor_base_size;
 
+// Sum of the squared weights of all basis functions for one Fourier mode,
+// computed on the fly instead of being stored for the whole grid
+static FFTW_REAL compute_mode_weighting(const double complex *sph_bessel_coeff, size_t n4dimen, size_t ncopy,
+                                        size_t ix_abs, size_t iy, size_t iz)
+{
+  FFTW_REAL mode_weighting = 0.0;
+  for (size_t m = 0; m < ncopy; m++)
+  {
+    complex weight = sph_bessel_coeff[n4dimen * irank_p[0][m] + ix_abs] *
+                     sph_bessel_coeff[n4dimen * irank_p[1][m] + iy] *
+                     sph_bessel_coeff[n4dimen * irank_p[2][m] + iz];
+    mode_weighting += cabs(weight) * cabs(weight);
+  }
+  return mode_weighting;
+}
+
 int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_grid,
                                     ptrdiff_t local_n0_fourier_return, ptrdiff_t local_0_start_fourier_return,
                                     FFTW_COMPLEX *return_field)
@@ -29,7 +45,21 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
 
   int pmax = 6;
 
-  int nsubdivide = 21; //(pmax%2==0)?pmax+1:pmax+2;
+  int mpi_size;
+  MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+
+  ptrdiff_t N0_pan_grid = descriptor_base_size << relative_level;
+
+  if (N0_fourier_grid % N0_pan_grid != 0)
+    return (100015);
+
+  int fdim = N0_fourier_grid / N0_pan_grid;
+  size_t nfft_dim = N0_fourier_grid;
+  size_t npan_dim = N0_pan_grid;
+
+  int SHARED_FOUR_PAN_SPACE = (mpi_size == 1) && (N0_pan_grid % 2 == 0) && (sizeof(PAN_REAL) == sizeof(FFTW_REAL));
+
+  int nsubdivide = SHARED_FOUR_PAN_SPACE ? 1 : 21; //(pmax%2==0)?pmax+1:pmax+2;
 
   size_t ncopy = (pmax + 1) * (pmax + 2) * (pmax + 3) / 6;
 
@@ -44,17 +74,6 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
   ptrdiff_t size_to_alloc_pan;
   ptrdiff_t local_fourier_x_start, local_fourier_x_end;
   FFTW_PLAN output_coeff_forward_plan;
-
-  ptrdiff_t N0_pan_grid = descriptor_base_size << relative_level;
-
-  if (N0_fourier_grid % N0_pan_grid != 0)
-    return (100015);
-
-  int fdim = N0_fourier_grid / N0_pan_grid;
-  size_t nfft_dim = N0_fourier_grid;
-  size_t npan_dim = N0_pan_grid;
-
-  int SHARED_FOUR_PAN_SPACE = (nsubdivide == 1) && (fdim == 1) && (sizeof(PAN_REAL) == sizeof(FFTW_REAL));
 
   ////////////////////////////////////////////////////////////////////////////////////
 
@@ -147,7 +166,20 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
     // const ptrdiff_t ndimens_alloc_pan[] = {N0_pan_grid, N0_pan_grid, N0_pan_grid+2};
     howmany = ncopy;
 
-    size_to_alloc_pan = howmany * local_n0_pan * N0_pan_grid * (N0_pan_grid + 2);
+    if (SHARED_FOUR_PAN_SPACE)
+    {
+      const ptrdiff_t ndimens_alloc_pan[] = {N0_pan_grid, N0_pan_grid, N0_pan_grid + 2};
+      ptrdiff_t local_n0_pan_fft, local_0_start_pan_fft;
+      size_to_alloc_pan = FFTW_MPI_LOCAL_SIZE_MANY(rank, ndimens_alloc_pan, howmany,
+                                                   FFTW_MPI_DEFAULT_BLOCK, MPI_COMM_WORLD,
+                                                   &local_n0_pan_fft, &local_0_start_pan_fft);
+      if ((local_0_start_pan_fft != local_0_start_pan) || (local_n0_pan_fft != local_n0_pan))
+        return (100037);
+    }
+    else
+    {
+      size_to_alloc_pan = howmany * local_n0_pan * N0_pan_grid * (N0_pan_grid + 2);
+    };
 
     //printf("size_to_alloc_fourier = %td\n",size_to_alloc_fourier);
     //printf("size_to_alloc_pan     = %td\n",size_to_alloc_pan);
@@ -161,16 +193,10 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
   // If nsubdivide==1 then use the same structure to store both.
 
   void *panphasia_coefficients = FFTW_MALLOC(sizeof(PAN_REAL) * size_to_alloc_pan);
-  void *fourier_grids;
+  void *fourier_grids = NULL;
 
   if (panphasia_coefficients == NULL)
     return (100040);
-
-  void *mode_weightings = FFTW_MALLOC(sizeof(FFTW_REAL) * size_to_alloc_fourier / nchunk);
-
-  FFTW_REAL *ptr_mode_weightings;
-  ptr_mode_weightings = mode_weightings;
-  memset(ptr_mode_weightings, 0, sizeof(FFTW_REAL) * size_to_alloc_fourier / nchunk);
 
   FFTW_REAL *ptr_real_fourier_grid;
   FFTW_REAL *ptr_panphasia_coefficients = panphasia_coefficients;
@@ -256,7 +282,8 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
 
   {
     int rank = 3;
-    const ptrdiff_t ndimens[3] = {N0_fourier_grid, N0_fourier_grid, N0_fourier_grid};
+    ptrdiff_t n_fft_plan = SHARED_FOUR_PAN_SPACE ? N0_pan_grid : N0_fourier_grid;
+    const ptrdiff_t ndimens[3] = {n_fft_plan, n_fft_plan, n_fft_plan};
     ptrdiff_t howmany = nchunk;
     ptrdiff_t block = FFTW_MPI_DEFAULT_BLOCK;
     ptrdiff_t tblock = FFTW_MPI_DEFAULT_BLOCK;
@@ -301,9 +328,11 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
 #pragma omp parallel for collapse(2) private(index_p, index_f, m)
 #endif
 
-        for (int iy_f = 0, iy_p = 0; iy_f < nfft_dim; iy_f += fdim, iy_p++)
-          for (int iz_f = 0, iz_p = 0; iz_f < nfft_dim; iz_f += fdim, iz_p++)
+        for (size_t iy_p = 0; iy_p < npan_dim; iy_p++)
+          for (size_t iz_p = 0; iz_p < npan_dim; iz_p++)
           {
+            size_t iy_f = iy_p * fdim;
+            size_t iz_f = iz_p * fdim;
             index_p = ix_p * N0_pan_grid * (N0_pan_grid + 2) + iy_p * (N0_pan_grid + 2) + iz_p;
             index_f = ix_f * N0_fourier_grid * (N0_fourier_grid + 2) + iy_f * (N0_fourier_grid + 2) + iz_f;
 
@@ -326,23 +355,47 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
       //int m;
 
 #ifdef USE_OPENMP
-#pragma omp parallel for collapse(3) private(index1, index2, weight, m)
+#pragma omp parallel for collapse(3) private(index1, index2, weight)
 #endif
       for (int ix = 0; ix < local_n0_fourier_return; ix++)
         for (int iy = 0; iy < nfft_dim; iy++)
           for (int iz = 0; iz <= nfft_dim / 2; iz++)
           {
             index1 = ix * N0_fourier_grid * (N0_fourier_grid / 2 + 1) + iy * (N0_fourier_grid / 2 + 1) + iz;
+            size_t base_index2;
+            int use_conj = 0;
+            if (SHARED_FOUR_PAN_SPACE)
+            {
+              size_t ix_p = (size_t)(ix + local_0_start_fourier_return) % npan_dim;
+              size_t iy_p = (size_t)iy % npan_dim;
+              size_t iz_p = (size_t)iz % npan_dim;
+              if (iz_p > npan_dim / 2)
+              {
+                ix_p = (ix_p == 0) ? 0 : npan_dim - ix_p;
+                iy_p = (iy_p == 0) ? 0 : npan_dim - iy_p;
+                iz_p = npan_dim - iz_p;
+                use_conj = 1;
+              };
+              base_index2 = nchunk * (ix_p * N0_pan_grid * (N0_pan_grid / 2 + 1) + iy_p * (N0_pan_grid / 2 + 1) + iz_p);
+            }
+            else
+            {
+              base_index2 = nchunk * index1;
+            };
+            FFTW_COMPLEX sum = return_field[index1];
             for (int m = 0; m < nchunk; m++)
             {
-              index2 = nchunk * index1 + m;
+              index2 = base_index2 + m;
+              double complex coeff = ptr_cmplx_fourier_grid[index2];
+              if (use_conj)
+                coeff = conj(coeff);
 
               weight = sph_bessel_coeff[n4dimen * irank_p[0][m + moffset] + ix + local_0_start_fourier_return] *
                        sph_bessel_coeff[n4dimen * irank_p[1][m + moffset] + iy] *
                        sph_bessel_coeff[n4dimen * irank_p[2][m + moffset] + iz];
-              return_field[index1] += weight * ptr_cmplx_fourier_grid[index2];
-              ptr_mode_weightings[index1] += cabs(weight) * cabs(weight);
+              sum += weight * coeff;
             };
+            return_field[index1] = sum;
           };
     };
 
@@ -357,8 +410,6 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
     int kx, ky, kz;
     const double pi = 4.0 * atan(1.0);
     size_t index1;
-
-    double min_weight = 100.0;
 
 #ifdef USE_OPENMP
 #pragma omp parallel for collapse(3) private(index1, kx, ky, kz, phase_shift_and_scale)
@@ -375,20 +426,19 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
           if ((kx == nfft_dim / 2) || (ky == nfft_dim / 2) || (kz == nfft_dim / 2))
           {
             // Set Nyquist modes to zero - not used by IC_Gen anyway.
-            phase_shift_and_scale = 0.0;       //1.0/pow((double)nfft_dim,1.5);  // No phase shift
-            ptr_mode_weightings[index1] = 0.0; // Set squared weight to zero
+            phase_shift_and_scale = 0.0; //1.0/pow((double)nfft_dim,1.5);  // No phase shift
           }
           else
           {
+            FFTW_REAL mode_weighting = compute_mode_weighting(sph_bessel_coeff, n4dimen, ncopy,
+                                                              ix + local_0_start_fourier_return, iy, iz);
             phase_shift_and_scale = sqrt((double)(fdim * fdim * fdim)) *
-                                    cexp((double)fdim * (-I) * pi * (double)(kx + ky + kz) / sqrt(ptr_mode_weightings[index1]) /
+                                    cexp((double)fdim * (-I) * pi * (double)(kx + ky + kz) / sqrt(mode_weighting) /
                                          (double)nfft_dim) /
                                     pow((double)nfft_dim, 1.5);
           };
 
           return_field[index1] *= phase_shift_and_scale;
-          if (ptr_mode_weightings[index1] < min_weight)
-            min_weight = ptr_mode_weightings[index1];
         };
 
     //  printf("Minimum weight %lf\n",sqrt(min_weight));
@@ -456,8 +506,8 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
 
           int index = ix * N0_fourier_grid * (N0_fourier_grid / 2 + 1) + iy * (N0_fourier_grid / 2 + 1) + iz;
           fprintf(fp, "%6lu%6d%6d %14.8lf %14.8lf %14.8lf \n", ix + local_0_start_fourier_return, iy, iz,
-                  creal(return_field[index]), cimag(return_field[index]), sqrt(ptr_mode_weightings[index]));
-          //		ptr_mode_weightings[index]);
+                  creal(return_field[index]), cimag(return_field[index]), ((ix + local_0_start_fourier_return == nfft_dim / 2) || (iy == nfft_dim / 2) || (iz == nfft_dim / 2)) ? 0.0 :
+                  sqrt(compute_mode_weighting(sph_bessel_coeff, n4dimen, ncopy, ix + local_0_start_fourier_return, iy, iz)));
         };
     fclose(fp);
   }
@@ -474,8 +524,8 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
           {
             int index = ix * N0_fourier_grid * (N0_fourier_grid / 2 + 1) + iy * (N0_fourier_grid / 2 + 1) + iz;
             fprintf(fp, "%6lu%6d%6d %14.8lf %14.8lf %14.8lf \n", ix + local_0_start_fourier_return, iy, iz,
-                    creal(return_field[index]), cimag(return_field[index]), sqrt(ptr_mode_weightings[index]));
-            //   ptr_mode_weightings[index]);
+                    creal(return_field[index]), cimag(return_field[index]), ((ix + local_0_start_fourier_return == nfft_dim / 2) || (iy == nfft_dim / 2) || (iz == nfft_dim / 2)) ? 0.0 :
+                  sqrt(compute_mode_weighting(sph_bessel_coeff, n4dimen, ncopy, ix + local_0_start_fourier_return, iy, iz)));
           };
         };
     fclose(fp);
@@ -522,7 +572,6 @@ int PANPHASIA_compute_kspace_field_(size_t relative_level, ptrdiff_t N0_fourier_
   };
 
   // Free all memory assigned by FFTW_MALLOC
-  FFTW_FREE(mode_weightings);
   FFTW_FREE(sph_bessel_coeff);
   FFTW_FREE(panphasia_coefficients);
 
